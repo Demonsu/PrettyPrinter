@@ -23,12 +23,6 @@ nest i (s `Text` x) 	= s `Text` nest i x
 nest i (j `Line` x)		= (i+j) `Line` nest i x
 nest i Nil				= Nil
 
-nest :: Int -> Doc -> Doc
-nest a x	=
-	case x of
-		|	Text s sx  -> Text s (nest a sx)
-	    |	Line j sx  -> (i+j) `Line` (nest a sx)
-	    | 	Nil 	   -> Nil
 	 
 	 
 text :: String -> Doc

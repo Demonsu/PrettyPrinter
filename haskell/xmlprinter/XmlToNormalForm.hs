@@ -46,27 +46,47 @@ data XML 				= Elt String [Att] [XML]
 
 data Att 				= Att String String
 
-showXML x 				= showXMLs x
+folddoc :: (Doc -> Doc -> Doc) -> [Doc] -> Doc
+folddoc f []						= nil
+folddoc f [x]						= x
+folddoc f (x:xs)					= f x (folddoc f xs)
 
-showXMLs :: XML -> Doc
-showXMLs (Elt n [a] []) 	= text "<" <> showTag n [a] <> text "/>"
-showXMLs (Elt n [a] (c:cs)) = text "<" <> showTag n [a] <> text ">" <>
-							showXMLs c <>
-							text "</" <> text n <> text ">"				
-showXMLs (Txt s) 		= text s
+group :: [Doc] -> Doc
+group (x:xs) 						= x <> group xs
+group []							= Nil
+
+showFill :: (XML -> [Doc]) -> [XML] -> [Doc]
+showFill f []						= [nil]
+showFill f (x:xs)					= concat (map f (x:xs))
+
+
+showXML :: XML -> Doc
+showXML x 							= folddoc (<>) (showXMLs x)
+
+showXMLs :: XML -> [Doc]
+showXMLs (Elt n [] []) 				= [text "<" <> text "" <> text "/>"]
+showXMLs (Elt n [] (c:cs)) 			= [text "<" <> text "" <> text ">" <>
+									  group (showFill showXMLs (c:cs)) <>
+									  text "</" <> text n <> text ">"]
+showXMLs (Elt n (a:xs) []) 			= [text "<" <> showTag n (a:xs) <> text "/>"]
+showXMLs (Elt n (a:xs) (c:cs))	 	= [text "<" <> showTag n (a:xs) <> text ">" <>
+									  group (showFill showXMLs (c:cs)) <>
+									  text "</" <> text n <> text ">"]				
+showXMLs (Txt s) 					= [text s]
 
 showAtt :: Att -> Doc
-showAtt (Att n v) 		= text n <> text "=" <> text (quoted v)
+showAtt (Att n v) 					= text n <> text "=" <> text (quoted v)
+
 showAtts :: [Att] -> Doc
-showAtts (x:xs) 		= showAtt x <> showAtts xs
-showAtts []				= text ""
+showAtts (x:xs) 					= showAtt x <> showAtts xs
+showAtts []							= text ""
 
 quoted :: String -> String
-quoted s 				= "\"" ++ s ++ "\""
+quoted s 							= "\"" ++ s ++ "\""
 
 showTag :: String -> [Att] -> Doc
-showTag n [a] 			= text n <> showAtts [a]
-
+showTag n (a:xs) 					= text n <> showAtts (a:xs)
+showTag n [] 						= text n <> showAtts []
 
 xml :: XML
 xml 					= Elt "p" [
@@ -75,18 +95,12 @@ xml 					= Elt "p" [
 							Att "size" "10"
 							] [
 							Txt "Here is some",
-							Elt "em" [] [
-								Txt "emphasized"
-							],
-							Txt "text.",
-							Txt "Here is a",
-							Elt "a" [
-								Att "href" "http://www.eg.com/"
+							Elt "em" [
+							
 							] [
-								Txt "link"
-							],
-								Txt "elsewhere."
+								Txt "emphasized"
+							]
 							]
 -- <p color="red"> Here is some </p>
 main :: IO ()
-main = putStrLn (layout (showXMLs xml))
+main = putStrLn (layout (showXML xml))
