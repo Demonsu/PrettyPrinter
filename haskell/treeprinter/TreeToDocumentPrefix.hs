@@ -1,10 +1,8 @@
 module Main (main) where
 
-infixr 6 				:<>
-infixr 6 				<>
 
 data DOC = NIL
-		 | DOC :<> DOC
+		 | UNION DOC DOC
 		 | NEST Int DOC
 		 | TEXT String
 		 | LINE
@@ -14,17 +12,14 @@ data DOC = NIL
 nil :: DOC
 nil 					= NIL
 
-(<>) :: DOC -> DOC -> DOC
-x <> y 					= x :<> y
+union :: DOC -> DOC -> DOC
+union x y				= UNION x y
 
 text :: String -> DOC
 text s 					= TEXT s
 
 nest :: Int -> DOC -> DOC
-nest i x 				= NEST i x
-
-
-
+nest i line				= NEST i line
 
 line :: DOC
 line 					= LINE
@@ -34,23 +29,24 @@ line 					= LINE
 data Tree               = Node String [Tree]
 
 showTree :: Tree -> DOC
-showTree (Node s ts)    = text s <> showBracket ts
+showTree (Node s ts)    = union (text s) (showBracket ts)
 
 showBracket :: [Tree] -> DOC
 showBracket []          = nil
-showBracket ts          = text "[" <>
-                          nest 2 (line <> showTrees ts) <>
-				          line <> text "]"
+showBracket ts          = union (text "[")
+                          (union (nest 2 (union line (showTrees ts)))
+				          (union line (text "]")))
 
 showTrees :: [Tree] -> DOC
 showTrees [t]           = showTree t
-showTrees (t:ts)        = showTree t <> text "," <> line <> showTrees ts
+showTrees (t:ts)        = union (showTree t) (union (text ",") (union line (showTrees ts)))
 
 
 tree :: Tree
 tree 					= Node "aaa" [
 							Node "bbbbb" [],
-							Node "eee" []
+							Node "eee" [],
+							Node "ffff" []
 							]
 
 main :: IO ()
