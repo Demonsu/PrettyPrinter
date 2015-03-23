@@ -2,8 +2,6 @@ module Main (main) where
 
 infixr 6 				<>
 
-
-
 data Doc = Nil
 		 | String `Text` Doc
 		 | Int `Line` Doc
@@ -23,7 +21,6 @@ nest i (s `Text` x) 	= s `Text` nest i x
 nest i (j `Line` x)		= (i+j) `Line` nest i x
 nest i Nil				= Nil
 
-	 
 	 
 text :: String -> Doc
 text s 					= s `Text` Nil

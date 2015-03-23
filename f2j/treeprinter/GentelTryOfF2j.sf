@@ -1,0 +1,20 @@
+--> 87178291200
+
+let rec fact (n : java.math.BigInteger) : java.math.BigInteger =
+    if n.intValue() == 0
+        then new java.math.BigInteger("1")
+        else n.multiply(fact(n.subtract(new java.math.BigInteger("1"))))
+;
+fact (new java.math.BigInteger("20"))
+
+-- Tree
+data BTree [A,B] = Leaf A
+				| Node B BTree [A,B] BTree [A,B]
+				;
+let rec ct [A,B] (tree:BTree[A,B]) : Int =
+	case tree of 
+		Leaf a -> 1
+	  | Node b l r -> ct[A,B] l + ct[A,B] r
+	  ;
+let tree= Node[Int,Int] 1 (Leaf[Int,Int] 1) (Node[Int,Int] 2 (Leaf[Int,Int] 1) (Leaf[Int,Int] 2));
+ct[Int,Int] tree
