@@ -18,8 +18,8 @@ Nil <> y				= y
 
 nest :: Int -> Doc -> Doc
 nest i (s `Text` x) 	= s `Text` nest i x
-nest i (j `Line` x)	= (i+j) `Line` nest i x
-nest i Nil		= Nil
+nest i (j `Line` x)		= (i+j) `Line` nest i x
+nest i Nil				= Nil
 
 	 
 text :: String -> Doc
