@@ -61,6 +61,9 @@ let (+>)[A] (a: A)(l: PList[A]): PList[A]=
 data XMLNode = XMLText      String
              | XMLAttr      String String
              | XMLElement   String PList[XMLNode] PList[XMLNode]
+             | XMLCData		String
+             | XMLComment	String
+             | XMLProcInst	String PList[XMLNode] PList[XMLNode]
 ;
 
 -- XML to document
@@ -71,6 +74,10 @@ let quoted (s: String): String=
 let rec showXML (xml: XMLNode): Doc=
 	case xml of
 			XMLText s 						-> text s
+		|	XMLCData s 						-> text "<![CDATA[" <> text s <> text "]]>"
+		|	XMLComment s					-> text "<--" <> text s <> text "-->"
+		|	XMLProcInst s x y				-> text "<?" <> text s <> showATTs x <> text "?>" <> line
+												<>showXMLs y
 		|	XMLAttr x y 					-> text " " <> text x <> text "=" <> text (quoted y) 
 		|	XMLElement s x y				-> text "<" <> text s <> showATTs x <> text ">" <>
 												(nest 2 (line <> showXMLs y)) <>
@@ -91,8 +98,16 @@ showXMLs (xmls: PList[XMLNode]): Doc=
 				|	Cons y ys					-> showXML x <> line <> showXMLs (y +> ys)
 		}
 ;
-let xml= XMLElement "p" 
-			(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 
-			(Cons[XMLNode] (XMLElement "h1" (Cons[XMLNode] (XMLAttr "defalt" "true") (Nill[XMLNode])) (Cons[XMLNode] (XMLText "Small Step") (Nill[XMLNode]))) (Nill[XMLNode]))
+let xml= XMLProcInst "xml" 
+			((Cons[XMLNode] (XMLAttr "type" "xml") (Cons[XMLNode] (XMLAttr "version" "1.0") (Nill[XMLNode]))))
+
+			(Cons[XMLNode]
+			(	XMLElement "p" 
+				(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 
+				(Cons[XMLNode] (XMLElement "h1" (Cons[XMLNode] (XMLAttr "defalt" "true") (Nill[XMLNode])) (Cons[XMLNode] (XMLText "Small Step") (Cons[XMLNode] (XMLCData "<function> text </function>") (Nill[XMLNode])))) (Cons[XMLNode] (XMLComment "this should be ignored") (Nill[XMLNode])))
+			)
+			(
+				Nill[XMLNode]
+			))
 ;
 showDoc (showXML xml)
