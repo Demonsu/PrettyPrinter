@@ -1,0 +1,98 @@
+-- naive pretty printer library
+
+data Doc = Nil
+		|  TEXT String Doc
+		|  LINE Int Doc
+;
+
+let nil=Nil
+;
+
+let rec (<>) (x: Doc) (y: Doc) : Doc=
+	case x of
+			TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	Nil 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc=
+	case x of
+			TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	Nil 		-> Nil
+;
+
+let text (s: String): Doc=
+	TEXT s Nil
+;
+
+let line: Doc= LINE 0 Nil
+;
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec copy (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(copy (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (copy i)) (showDoc d)
+		| 	Nil			-> ""
+;
+
+
+-- Naive XML definition (from elton)
+
+data PList[A] = Nill
+              | Cons A (PList[A])
+;
+
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+
+data XMLNode = XMLText      String
+             | XMLAttr      String String
+             | XMLElement   String PList[XMLNode] PList[XMLNode]
+;
+
+-- XML to document
+
+let quoted (s: String): String=
+	"\"".concat(s.concat("\""))
+;
+let rec showXML (xml: XMLNode): Doc=
+	case xml of
+			XMLText s 						-> text s
+		|	XMLAttr x y 					-> text " " <> text x <> text "=" <> text (quoted y) 
+		|	XMLElement s x y				-> text "<" <> text s <> showATTs x <> text ">" <>
+												(nest 2 (line <> showXMLs y)) <>
+												line <> text "</" <> text s <> text ">"
+and
+showATTs (xmls: PList[XMLNode]): Doc=
+	case xmls of
+			Nill							-> Nil
+		|	Cons x xs 						-> showXML x <> showXMLs xs	 
+and
+showXMLs (xmls: PList[XMLNode]): Doc=
+	case xmls of
+			Nill							-> Nil
+		|	Cons x xs 						-> 
+		{
+			case xs of
+					Nill						-> showXML x
+				|	Cons y ys					-> showXML x <> line <> showXMLs (y +> ys)
+		}
+;
+let xml= XMLElement "p" 
+			(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 
+			(Cons[XMLNode] (XMLElement "h1" (Cons[XMLNode] (XMLAttr "defalt" "true") (Nill[XMLNode])) (Cons[XMLNode] (XMLText "Small Step") (Nill[XMLNode]))) (Nill[XMLNode]))
+;
+showDoc (showXML xml)
