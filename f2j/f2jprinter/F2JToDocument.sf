@@ -1,0 +1,49 @@
+-- naive pretty printer library
+
+data Doc = Nil
+		|  TEXT String Doc
+		|  LINE Int Doc
+;
+
+let nil=Nil
+;
+
+let rec (<>) (x: Doc) (y: Doc) : Doc=
+	case x of
+			TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	Nil 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc=
+	case x of
+			TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	Nil 		-> Nil
+;
+
+let text (s: String): Doc=
+	TEXT s Nil
+;
+
+let line: Doc= 
+	LINE 0 Nil
+;
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	Nil			-> ""
+;

@@ -26,24 +26,25 @@ let text (s: String): Doc=
 	TEXT s Nil
 ;
 
-let line: Doc= LINE 0 Nil
+let line: Doc= 
+	LINE 0 Nil
 ;
 
 let concat (x : String) (y : String): String= 
 	x.concat(y)
 ;
 
-let rec copy (i: Int): String=
+let rec space (i: Int): String=
 	if i==0 then
 				""
 			 else
-			 	" ".concat(copy (i-1))
+			 	" ".concat(space (i-1))
 ;
 
 let rec showDoc(doc: Doc): String=
 	case doc of
 			TEXT s x	-> concat s (showDoc x)
-		|	LINE i d 	-> concat (concat "\n" (copy i)) (showDoc d)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
 		| 	Nil			-> ""
 ;
 
@@ -63,7 +64,7 @@ data XMLNode = XMLText      String
              | XMLElement   String PList[XMLNode] PList[XMLNode]
              | XMLCData		String
              | XMLComment	String
-             | XMLProcInst	String PList[XMLNode] PList[XMLNode]
+             | XMLProcInst	String PList[XMLNode]
 ;
 
 -- XML to document
@@ -76,8 +77,8 @@ let rec showXML (xml: XMLNode): Doc=
 			XMLText s 						-> text s
 		|	XMLCData s 						-> text "<![CDATA[" <> text s <> text "]]>"
 		|	XMLComment s					-> text "<--" <> text s <> text "-->"
-		|	XMLProcInst s x y				-> text "<?" <> text s <> showATTs x <> text "?>" <> line
-												<>showXMLs y
+		|	XMLProcInst s x					-> text "<?" <> text s <> text "?>" <> line
+												<>showXMLs x
 		|	XMLAttr x y 					-> text " " <> text x <> text "=" <> text (quoted y) 
 		|	XMLElement s x y				-> text "<" <> text s <> showATTs x <> text ">" <>
 												(nest 2 (line <> showXMLs y)) <>
@@ -98,9 +99,7 @@ showXMLs (xmls: PList[XMLNode]): Doc=
 				|	Cons y ys					-> showXML x <> line <> showXMLs (y +> ys)
 		}
 ;
-let xml= XMLProcInst "xml" 
-			((Cons[XMLNode] (XMLAttr "type" "xml") (Cons[XMLNode] (XMLAttr "version" "1.0") (Nill[XMLNode]))))
-
+let xml= XMLProcInst "xml version=1.0 encoding=UTF-8 " 
 			(Cons[XMLNode]
 			(	XMLElement "p" 
 				(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 

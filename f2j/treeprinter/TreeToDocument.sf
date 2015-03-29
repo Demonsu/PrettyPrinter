@@ -29,8 +29,28 @@ let text (s: String): Doc=
 let line: Doc= LINE 0 Nil
 ;
 
+-- document to string
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	Nil			-> ""
+;
+
 -- tree definition
-	-- list definition
+
 data PList[A] = Nill
               | Cons A (PList[A])
 ;
@@ -63,25 +83,7 @@ showTrees (tree: PList[BTree]): Doc=
 
 ;
 
--- document to string
 
-let concat (x : String) (y : String): String= 
-	x.concat(y)
-;
-
-let rec copy (i: Int): String=
-	if i==0 then
-				""
-			 else
-			 	" ".concat(copy (i-1))
-;
-
-let rec showDoc(doc: Doc): String=
-	case doc of
-			TEXT s x	-> concat s (showDoc x)
-		|	LINE i d 	-> concat (concat "\n" (copy i)) (showDoc d)
-		| 	Nil			-> ""
-;
 let tree = Node "aaa" 
 	(Cons[BTree] 
 		(Node "bbbbb" (Nill[BTree])) 
