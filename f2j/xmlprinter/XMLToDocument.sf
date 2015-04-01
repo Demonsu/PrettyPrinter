@@ -77,8 +77,7 @@ let rec showXML (xml: XMLNode): Doc=
 			XMLText s 						-> text s
 		|	XMLCData s 						-> text "<![CDATA[" <> text s <> text "]]>"
 		|	XMLComment s					-> text "<--" <> text s <> text "-->"
-		|	XMLProcInst s x					-> text "<?" <> text s <> text "?>" <> line
-												<>showXMLs x
+		|	XMLProcInst s x					-> text "<?" <> text s <>showATTs x <> text "?>" 
 		|	XMLAttr x y 					-> text " " <> text x <> text "=" <> text (quoted y) 
 		|	XMLElement s x y				-> text "<" <> text s <> showATTs x <> text ">" <>
 												(nest 2 (line <> showXMLs y)) <>
@@ -99,7 +98,16 @@ showXMLs (xmls: PList[XMLNode]): Doc=
 				|	Cons y ys					-> showXML x <> line <> showXMLs (y +> ys)
 		}
 ;
-let xml= XMLProcInst "xml version=1.0 encoding=UTF-8 " 
+
+
+-- Test 
+
+let xml= 	Cons[XMLNode]
+			(XMLProcInst "xml" 
+			 (
+			 	Cons[XMLNode] (XMLAttr "version" "1.0") (Cons[XMLNode] (XMLAttr "encoding" "UTF-8") (Nill[XMLNode]))
+			 )
+			) 
 			(Cons[XMLNode]
 			(	XMLElement "p" 
 				(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 
@@ -109,4 +117,4 @@ let xml= XMLProcInst "xml version=1.0 encoding=UTF-8 "
 				Nill[XMLNode]
 			))
 ;
-showDoc (showXML xml)
+showDoc (showXMLs xml)

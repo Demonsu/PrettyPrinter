@@ -47,3 +47,59 @@ let rec showDoc(doc: Doc): String=
 		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
 		| 	Nil			-> ""
 ;
+
+-- list definition
+
+data PList[A] = Nill
+              | Cons A (PList[A])
+;
+
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+
+-- F2JType definition
+
+data F2JType = F2JNormalType    String PList[F2JType]
+             | F2JPairedType    PList[F2JType]
+             | F2JFunctionType  F2JType F2JType
+;
+
+data F2JComment = F2JLineComment String
+                | F2JBlockComment String
+;
+
+data rec
+    F2JBindingBody = F2JLetBindingBody     String PList[F2JType] PList[F2JBindingParam] Maybe[F2JType] F2JExpr
+                   | F2JLetRecBindingBody  String PList[F2JType] PList[F2JBindingParam] F2JType F2JExpr
+
+and F2JApplicationParam = F2JApplicationParamExpr F2JExpr
+                        | F2JApplicationParamType PList[F2JType]
+
+     		-- Application
+and F2JExpr = F2JApplication   F2JExpr                F2JApplicationParam
+            -- Let binding                            and           ; expr
+            | F2JLet           F2JBindingBody         PList[F2JExpr] F2JExpr
+            -- Let rec binding                        and           ; expr
+            | F2JLetRec        F2JBindingBody         PList[F2JExpr] F2JExpr
+            -- Lambda function params                 inner expr
+            | F2JLambda        PList[F2JBindingParam] F2JExpr
+            -- case of
+            -- | F2JCase          F2JExpr PList[(F2JCaseAlternative, F2JExpr)]
+            -- ADT
+            | F2JADT           F2JType PList[F2JADTAlternative] F2JExpr
+            -- Alias
+            | F2JTypeAlias     F2JType F2JType F2JExpr
+            -- Tuple
+            | F2JPair          PList[F2JExpr]
+            -- Int literal
+            | F2JIntLiteral    String
+            -- Double literal
+            -- Long literal
+            -- Short literal
+            -- Byte literal
+            -- String Literal
+            | F2JStringLiteral String
+            | F2JVariable      String
+            | F2JBlock         PList[F2JExpr]
+;
