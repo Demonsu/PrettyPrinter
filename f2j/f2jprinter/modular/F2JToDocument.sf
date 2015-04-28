@@ -1,62 +1,7 @@
--- naive pretty printer library
-
-data Doc = NIL
-		|  TEXT String Doc
-		|  LINE Int Doc
-;
-
-let nil = NIL
-;
-
-let rec (<>) (x: Doc) (y: Doc) : Doc=
-	case x of
-			TEXT s d 	-> TEXT s (d <> y)
-		|	LINE i e	-> LINE i (e <> y)		
-		|	NIL 		-> y
-;
-
-let rec nest (i: Int) (x: Doc): Doc=
-	case x of
-			TEXT s d 	-> TEXT s (nest i d)
-		|	LINE j c 	-> LINE (i+j) (nest i c)
-		|	NIL 		-> NIL
-;
-
-let text (s: String): Doc=
-	TEXT s NIL
-;
-
-let line: Doc= 
-	LINE 0 NIL
-;
-
-let concat (x : String) (y : String): String= 
-	x.concat(y)
-;
-
-let rec space (i: Int): String=
-	if i==0 then
-				""
-			 else
-			 	" ".concat(space (i-1))
-;
-
-let rec showDoc(doc: Doc): String=
-	case doc of
-			TEXT s x	-> concat s (showDoc x)
-		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
-		| 	NIL			-> ""
-;
-
--- list definition
-
-data PList[A] = Nil
-              | Cons A (PList[A])
-;
-
-let (+>)[A] (a: A)(l: PList[A]): PList[A]=
-	Cons[A] a l
-;
+{-#
+    INCLUDE "PrettyPrinterLib.sf"
+    INCLUDE "PList.sf"
+#-}
 
 -- F2JType definition
 
@@ -69,21 +14,41 @@ data F2JType = F2JNormalType    String PList[F2JType]
 
 let rec showF2JType (ftype: F2JType): Doc=
 	case ftype of
-			F2JNormalType name params -> text s <> (showF2JTypes params)
-		|	F2JPairedType types		  -> text "[" <> showF2JTypes types <> text "]"
-		|	F2JFunctionType from to   -> showF2JType from <> text "->" <> showF2JType to
-and 
-showF2JTypes (ftypelist: PList[F2JType]): Doc=
+			F2JNormalType name params -> 
+			{
+				case params of
+					Nil 			  -> text name
+				|	Cons x xs		  -> text name <> text "[" <> showF2JTypes (x +> xs) <> text "]"
+				
+			}
+		|	F2JPairedType types		  -> text "(" <> showF2JTypes types <> text ")"
+		|	F2JFunctionType from to   -> showF2JType from <> text " -> " <> showF2JType to
+and
+showF2JTypes (ftypelist: PList[F2JType]): Doc =
 	case ftypelist of
-			Nil
-
-
-
-
-
-
-
+			Nil						  -> NIL
+		|	Cons x xs				  -> 
+			{
+				case xs of
+					Nil 			  -> showF2JType x
+				|	Cons y ys 		  -> showF2JType y <> text "," <> showF2JTypes (y +> ys)
+			}
+;
 
 -- Test
 
 
+let f2jtype = F2JFunctionType (
+								F2JPairedType (
+												Cons[F2JType] (F2JNormalType "A" (Nil[F2JType])) (
+																		Cons[F2JType] (F2JNormalType "B" (Nil[F2JType])) (Nil[F2JType])
+																		)
+											  )
+							  ) 
+			  				  (
+			  				  	F2JNormalType "C" (Nil[F2JType])
+			  				  )	  
+
+;
+
+showDoc (showF2JType f2jtype) 
