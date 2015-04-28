@@ -1,33 +1,33 @@
 -- naive pretty printer library
 
-data Doc = Nil
+data Doc = NIL
 		|  TEXT String Doc
 		|  LINE Int Doc
 ;
 
-let nil=Nil
+let nil = NIL
 ;
 
 let rec (<>) (x: Doc) (y: Doc) : Doc=
 	case x of
 			TEXT s d 	-> TEXT s (d <> y)
 		|	LINE i e	-> LINE i (e <> y)		
-		|	Nil 		-> y
+		|	NIL 		-> y
 ;
 
 let rec nest (i: Int) (x: Doc): Doc=
 	case x of
 			TEXT s d 	-> TEXT s (nest i d)
 		|	LINE j c 	-> LINE (i+j) (nest i c)
-		|	Nil 		-> Nil
+		|	NIL 		-> NIL
 ;
 
 let text (s: String): Doc=
-	TEXT s Nil
+	TEXT s NIL
 ;
 
 let line: Doc= 
-	LINE 0 Nil
+	LINE 0 NIL
 ;
 
 let concat (x : String) (y : String): String= 
@@ -45,13 +45,13 @@ let rec showDoc(doc: Doc): String=
 	case doc of
 			TEXT s x	-> concat s (showDoc x)
 		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
-		| 	Nil			-> ""
+		| 	NIL			-> ""
 ;
 
 
 -- Naive XML definition (from elton)
 
-data PList[A] = Nill
+data PList[A] = Nil
               | Cons A (PList[A])
 ;
 
@@ -85,16 +85,16 @@ let rec showXML (xml: XMLNode): Doc=
 and
 showATTs (xmls: PList[XMLNode]): Doc=
 	case xmls of
-			Nill							-> Nil
+			Nil								-> NIL
 		|	Cons x xs 						-> showXML x <> showXMLs xs	 
 and
 showXMLs (xmls: PList[XMLNode]): Doc=
 	case xmls of
-			Nill							-> Nil
+			Nil								-> NIL
 		|	Cons x xs 						-> 
 		{
 			case xs of
-					Nill						-> showXML x
+					Nil 						-> showXML x
 				|	Cons y ys					-> showXML x <> line <> showXMLs (y +> ys)
 		}
 ;
@@ -105,16 +105,16 @@ showXMLs (xmls: PList[XMLNode]): Doc=
 let xml= 	Cons[XMLNode]
 			(XMLProcInst "xml" 
 			 (
-			 	Cons[XMLNode] (XMLAttr "version" "1.0") (Cons[XMLNode] (XMLAttr "encoding" "UTF-8") (Nill[XMLNode]))
+			 	Cons[XMLNode] (XMLAttr "version" "1.0") (Cons[XMLNode] (XMLAttr "encoding" "UTF-8") (Nil[XMLNode]))
 			 )
 			) 
 			(Cons[XMLNode]
 			(	XMLElement "p" 
-				(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nill[XMLNode]))) 
-				(Cons[XMLNode] (XMLElement "h1" (Cons[XMLNode] (XMLAttr "defalt" "true") (Nill[XMLNode])) (Cons[XMLNode] (XMLText "Small Step") (Cons[XMLNode] (XMLCData "<function> text </function>") (Nill[XMLNode])))) (Cons[XMLNode] (XMLComment "this should be ignored") (Nill[XMLNode])))
+				(Cons[XMLNode] (XMLAttr "color" "red") (Cons[XMLNode] (XMLAttr "name" "xiafan") (Nil[XMLNode]))) 
+				(Cons[XMLNode] (XMLElement "h1" (Cons[XMLNode] (XMLAttr "defalt" "true") (Nil[XMLNode])) (Cons[XMLNode] (XMLText "Small Step") (Cons[XMLNode] (XMLCData "<function> text </function>") (Nil[XMLNode])))) (Cons[XMLNode] (XMLComment "this should be ignored") (Nil[XMLNode])))
 			)
 			(
-				Nill[XMLNode]
+				Nil[XMLNode]
 			))
 ;
 showDoc (showXMLs xml)
