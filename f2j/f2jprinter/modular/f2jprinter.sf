@@ -66,22 +66,34 @@ let rec showF2JType (ftype: F2JType): Doc=
 			{
 				case params of
 					Nil 			  -> text name
-				|	Cons x xs		  -> text name <> (text "[") <> (showF2JTypes (x +> xs)) <> (text "]")
+				|	Cons x xs		  -> text name <> text "[" <> (showF2JTypes (x +> xs) ";") <> text "]"
 				
 			}
-		|	F2JPairedType types		  -> text "(" <> showF2JTypes types <> text ")"
+		|	F2JPairedType types		  -> text "(" <> (showF2JTypes types ";") <> text ")"
 		|	F2JFunctionType from to   -> showF2JType from <> text " -> " <> showF2JType to
 and
-showF2JTypes (ftypelist: PList[F2JType]): Doc =
+showF2JTypes (ftypelist: PList[F2JType]) (decollator: String): Doc =
 	case ftypelist of
 			Nil						  -> NIL
 		|	Cons x xs				  -> 
 			{
 				case xs of
 					Nil 			  -> showF2JType x
-				|	Cons y ys 		  -> showF2JType x <> text "," <> showF2JTypes (y +> ys)
+				|	Cons y ys 		  -> showF2JType x <> (text decollator) <> (showF2JTypes (y +> ys) decollator)
 			}
 ;
+
+
+data F2JBindingParam = F2JBindingParam String F2JType
+;
+
+
+let showF2JBindingParam (fbindingparam: F2JBindingParam): Doc=
+	case fbindingparam of
+			F2JBindingParam name types ->
+				text name <> text ": " <> showF2JType types
+;
+
 
 
 let f2jtype = F2JFunctionType (
@@ -97,4 +109,8 @@ let f2jtype = F2JFunctionType (
 
 ;
 
-showDoc (showF2JType f2jtype) 
+let fbingdingparam = F2JBindingParam "a" f2jtype
+;
+
+showDoc (showF2JBindingParam fbingdingparam)
+

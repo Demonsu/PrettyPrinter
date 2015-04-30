@@ -18,21 +18,77 @@ let rec showF2JType (ftype: F2JType): Doc=
 			{
 				case params of
 					Nil 			  -> text name
-				|	Cons x xs		  -> text name <> text "[" <> showF2JTypes (x +> xs) <> text "]"
+				|	Cons x xs		  -> text name <> text "[" <> (showF2JTypes (x +> xs) ",") <> text "]"
 				
 			}
-		|	F2JPairedType types		  -> text "(" <> showF2JTypes types <> text ")"
+		|	F2JPairedType types		  -> text "(" <> (showF2JTypes types ",") <> text ")"
 		|	F2JFunctionType from to   -> showF2JType from <> text " -> " <> showF2JType to
 and
-showF2JTypes (ftypelist: PList[F2JType]): Doc =
+showF2JTypes (ftypelist: PList[F2JType]) (decollator: String): Doc =
 	case ftypelist of
 			Nil						  -> NIL
 		|	Cons x xs				  -> 
 			{
 				case xs of
 					Nil 			  -> showF2JType x
-				|	Cons y ys 		  -> showF2JType y <> text "," <> showF2JTypes (y +> ys)
+				|	Cons y ys 		  -> showF2JType x <> (text decollator) <> (showF2JTypes (y +> ys) decollator)
 			}
+;
+
+-- F2JBindingParam definition
+
+data F2JBindingParam = F2JBindingParam String F2JType
+;
+
+-- F2JBindingParam to Document
+
+let showF2JBindingParam (fbindingparam: F2JBindingParam): Doc=
+	case fbindingparam of
+			F2JBindingParam name types ->
+				text name <> text ": " <> showF2JType types
+;
+
+-- F2JADTAlternative definition
+
+data F2JADTAlternative = F2JADTAlternative String PList[F2JType]
+;
+
+-- F2JADTAlternative to Document
+
+let rec showF2JADTAlternative (f2jadtalternative: F2JADTAlternative): Doc=
+	
+and showF2JADTAlternatives (f2jadtalternatives: Plist[F2JADTAlternative]): Doc=
+
+
+
+;
+
+-- F2JADTRecordItem definition
+
+data F2JADTRecordItem = F2JADTRecordItem String F2JType
+
+;
+
+-- F2JADTRecordItem to Document
+
+let showF2JADTRecordItem (f2jadtrecorditem: F2JADTRecordItem): Doc=
+
+
+;
+
+-- F2JADTBody definition
+
+data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
+                | F2JADTRecordBody F2JType PList[F2JADTRecordItem]
+;
+
+-- F2JADTBody to document
+
+let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
+	case f2jadtbody of
+			F2JNormalBody ftype alternatives		-> text "Data " <> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives)
+		|	F2JADTRecordBody ftype recorditems		-> text "Data " <> (showF2JType ftype) <> (text "= ") <> (showF2JADTRecordItems recorditems)
+
 ;
 
 -- Test
@@ -51,4 +107,10 @@ let f2jtype = F2JFunctionType (
 
 ;
 
-showDoc (showF2JType f2jtype) 
+let fbingdingparam = F2JBindingParam "a" f2jtype
+;
+
+showDoc (showF2JBindingParam fbingdingparam)
+
+--showDoc (showF2JType f2jtype) 
+

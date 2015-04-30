@@ -41,6 +41,13 @@ let rec space (i: Int): String=
 			 	" ".concat(space (i-1))
 ;
 
+let rec tab (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	"\t".concat(space (i-1))
+;
+
 let rec showDoc(doc: Doc): String=
 	case doc of
 			TEXT s x	-> concat s (showDoc x)

@@ -1,0 +1,24 @@
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+data Docsadsa = 
+		   Nil
+		|  AAA String Doc
+		|  BBB Int Doc
+;
+let rec showDoc(doc:  Doc): String=
+	case doc of
+			AAA s x 	-> concat s (showDoc x)
+		|	BBB i d 	-> concat ("\t") ("123") 
+		|   Nil			-> ""
+;
+let showLeng (s: String): Int=
+	s.length
+
+;
+let testa=  BBB 2 Nil
+;
+let tests= "12312"
+;
+--showDoc testa
+showLeng tests
