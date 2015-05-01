@@ -4,10 +4,22 @@
 #-}
 
 -- F2JType definition
+-- NormalType: A[B,C]
+-- PairedType: (A,B)
+-- FunctionType: (A[D],C) -> B
 
 data F2JType = F2JNormalType    String PList[F2JType]
              | F2JPairedType    PList[F2JType]
              | F2JFunctionType  F2JType F2JType
+;
+
+-- length of F2JNormalType
+
+let lengF2JType (ftype: F2JType): Int=
+	case ftype of
+			F2JNormalType name types -> length(name)
+		|	F2JPairedType types		 -> 4
+		|	F2JFunctionType t1 t2    -> 4
 ;
 
 -- F2JType to Document
@@ -42,10 +54,19 @@ data F2JBindingParam = F2JBindingParam String F2JType
 
 -- F2JBindingParam to Document
 
-let showF2JBindingParam (fbindingparam: F2JBindingParam): Doc=
+let rec showF2JBindingParam (fbindingparam: F2JBindingParam): Doc=
 	case fbindingparam of
 			F2JBindingParam name types ->
-				text name <> text ": " <> showF2JType types
+				text "(" <> text name <> text ": " <> showF2JType types <> text ")"
+and showF2JBindingParams (fbindingparams: PList[F2JBindingParam]): Doc=
+	case fbindingparams of
+			Nil 					-> NIL
+		|	Cons x xs				-> 
+			{
+				case xs of
+					Nil 			-> showF2JBindingParam x
+				|	Cons y ys		-> showF2JBindingParam x <> text " " <> showF2JBindingParams (y +> ys)
+			}
 ;
 
 -- F2JADTAlternative definition
@@ -56,24 +77,41 @@ data F2JADTAlternative = F2JADTAlternative String PList[F2JType]
 -- F2JADTAlternative to Document
 
 let rec showF2JADTAlternative (f2jadtalternative: F2JADTAlternative): Doc=
-	
-and showF2JADTAlternatives (f2jadtalternatives: Plist[F2JADTAlternative]): Doc=
+	case f2jadtalternative  of
+			F2JADTAlternative name types	-> text "\t" <> text name <> text " " <> (showF2JTypes types " ")
 
-
-
+and showF2JADTAlternatives (f2jadtalternatives: PList[F2JADTAlternative]) (indent: Int): Doc=
+	case f2jadtalternatives of
+			Nil 					-> NIL
+		|	Cons x xs				->
+			{
+				case xs of
+					Nil 			-> showF2JADTAlternative x
+				|	Cons y ys 		-> showF2JADTAlternative x <> 
+										line <>	text (space indent) <> text "|" <> (showF2JADTAlternatives (y +> ys) indent)
+			}
 ;
 
 -- F2JADTRecordItem definition
 
 data F2JADTRecordItem = F2JADTRecordItem String F2JType
-
 ;
 
 -- F2JADTRecordItem to Document
 
-let showF2JADTRecordItem (f2jadtrecorditem: F2JADTRecordItem): Doc=
+let rec showF2JADTRecordItem (f2jadtrecorditem: F2JADTRecordItem): Doc=
+	case f2jadtrecorditem of
+			F2JADTRecordItem name ty -> text "\t" <> text name <> text "\t\t: " <> showF2JType ty
 
-
+and showF2JADTRecordItems (f2jadtrecorditems: PList[F2JADTRecordItem]): Doc=
+	case f2jadtrecorditems of
+			Nil 					 -> NIL
+		|	Cons x xs				 -> 
+			{
+				case xs of
+					Nil 			 -> showF2JADTRecordItem x
+				|	Cons y ys		 -> showF2JADTRecordItem x <> text "," <> line <> showF2JADTRecordItems (y +> ys)
+			}
 ;
 
 -- F2JADTBody definition
@@ -86,31 +124,10 @@ data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
 
 let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
 	case f2jadtbody of
-			F2JNormalBody ftype alternatives		-> text "Data " <> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives)
-		|	F2JADTRecordBody ftype recorditems		-> text "Data " <> (showF2JType ftype) <> (text "= ") <> (showF2JADTRecordItems recorditems)
+			F2JADTNormalBody ftype alternatives		-> text "Data " <> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives (lengF2JType(ftype) + 7)) <> line <> text ";"
+		|	F2JADTRecordBody ftype recorditems		-> text "Data " <> (showF2JType ftype) <> (text "= {") <> line <> (showF2JADTRecordItems recorditems) <> line <> text "}" <> line <> text ";"
 
 ;
 
--- Test
 
-
-let f2jtype = F2JFunctionType (
-								F2JPairedType (
-												Cons[F2JType] (F2JNormalType "A" (Nil[F2JType])) (
-																		Cons[F2JType] (F2JNormalType "B" (Nil[F2JType])) (Nil[F2JType])
-																		)
-											  )
-							  ) 
-			  				  (
-			  				  	F2JNormalType "C" (Nil[F2JType])
-			  				  )	  
-
-;
-
-let fbingdingparam = F2JBindingParam "a" f2jtype
-;
-
-showDoc (showF2JBindingParam fbingdingparam)
-
---showDoc (showF2JType f2jtype) 
 

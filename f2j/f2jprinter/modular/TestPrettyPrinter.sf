@@ -1,0 +1,149 @@
+{-#
+    INCLUDE "F2JToDocument.sf"
+    INCLUDE "TestLib.sf"
+#-}
+
+
+-- Test
+-- (A,B) -> C
+--data F2JType = F2JNormalType    String PList[F2JType]
+--             | F2JPairedType    PList[F2JType]
+--             | F2JFunctionType  F2JType F2JType
+--;
+let f2jtype = F2JFunctionType (
+								F2JPairedType (
+												Cons[F2JType] (F2JNormalType "A" (Nil[F2JType])) (
+																		Cons[F2JType] (F2JNormalType "B" (Nil[F2JType])) (Nil[F2JType])
+																		)
+											  )
+							  ) 
+			  				  (
+			  				  	F2JNormalType "C" (Nil[F2JType])
+			  				  )	  
+
+;
+let testF2JType : TestFn = {
+    name = "F2JType",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JType f2jtype) )
+    }
+}
+;
+
+--data F2JBindingParam = F2JBindingParam String F2JType
+-- a: (A,B) -> C
+let fbingdingparam = F2JBindingParam "a" f2jtype
+;
+let fbingdingparam1 = F2JBindingParam "b" f2jtype
+;
+let fbingdingparam2 = F2JBindingParam "c" f2jtype
+;
+let fbingdingparams = Cons[F2JBindingParam] (fbingdingparam) (Cons[F2JBindingParam] (fbingdingparam1) (Cons[F2JBindingParam] (fbingdingparam2) (Nil[F2JBindingParam])))
+;
+let testF2JBindingParam : TestFn = {
+    name = "F2JBindingParam",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JBindingParams fbingdingparams) )
+    }
+}
+;
+
+--data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
+--                | F2JADTRecordBody F2JType PList[F2JADTRecordItem]
+--;
+--data F2JADTAlternative = F2JADTAlternative String PList[F2JType]
+let alternative1 = F2JADTAlternative 
+					"F2JNormalType" 
+					(
+						Cons[F2JType] 
+						(F2JNormalType "String" (Nil[F2JType])) 
+						(
+							Cons[F2JType] 
+							(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (Nil[F2JType])))
+							(Nil[F2JType])  
+						)
+					)
+;
+let alternative2 = F2JADTAlternative 
+					"F2JPairedType" 
+					(
+						Cons[F2JType] 
+						(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (Nil[F2JType])))
+						(Nil[F2JType])  
+					)
+;
+let alternative3 = F2JADTAlternative 
+					"F2JFunctionType" 
+					(
+						Cons[F2JType] 
+						(F2JNormalType "F2JType" (Nil[F2JType]) )
+						(
+							Cons[F2JType] 
+							(F2JNormalType "F2JType" (Nil[F2JType]) )
+							(
+								Nil[F2JType]
+							)
+						)  
+					)
+;
+let adtbody1 = F2JADTNormalBody 
+				(F2JNormalType "F2JType" (Nil[F2JType])) 
+				(
+					Cons[F2JADTAlternative] 
+						(alternative1)
+						(
+							Cons[F2JADTAlternative]
+							(alternative2)
+							(
+								Cons[F2JADTAlternative]
+								(alternative3)
+								(Nil[F2JADTAlternative])
+							)
+						)  
+				)
+;
+let testF2JADTBody1 : TestFn = {
+    name = "F2JADTBody  normal",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JADTBody adtbody1) )
+    }
+}
+;
+--data F2JADTRecordItem = F2JADTRecordItem String F2JType
+let recorditem1= F2JADTRecordItem "name" (F2JNormalType "Demonsu" (Nil[F2JType]))
+;
+let recorditem2= F2JADTRecordItem "age" (F2JNormalType "24" (Nil[F2JType]))
+;
+let recorditem3= F2JADTRecordItem "gender" (F2JNormalType "male" (Nil[F2JType]))
+;
+let adtbody2 = F2JADTRecordBody
+				(F2JNormalType "F2JRecord" (Nil[F2JType]))
+				(
+					Cons[F2JADTRecordItem] 
+						(recorditem1)
+						(
+							Cons[F2JADTRecordItem]
+							(recorditem2)
+							(
+								Cons[F2JADTRecordItem]
+								(recorditem3)
+								(Nil[F2JADTRecordItem])
+							)
+						)  
+				)	
+;	
+let testF2JADTBody2 : TestFn = {
+    name = "F2JADTBody  record",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JADTBody adtbody2) )
+    }
+}
+;		
+
+let tests=	(testF2JADTBody2 +>[TestFn]
+		 	(testF2JADTBody1 +>[TestFn]
+			(testF2JBindingParam +>[TestFn] 
+			(testF2JType +>[TestFn] (Nil[TestFn])))))
+;
+runTests tests
+
