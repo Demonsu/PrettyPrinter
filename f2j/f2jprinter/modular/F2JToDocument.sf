@@ -129,5 +129,108 @@ let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
 
 ;
 
+-- Show definition
+type Show[A] = A -> Doc;
+
+-- Maybe definition
+
+data Maybe[A] = Nothing
+              | Just A
+;
+
+-- Maybe to Document
+let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
+	case mb of
+			Nothing		-> NIL
+		|	Just x 		-> show x
+;
+
+
+-- F2J definition
+data rec
+    F2JBindingBody = F2JLetBindingBody     String PList[F2JType] PList[F2JBindingParam] Maybe[F2JType] F2JExpr
+                   | F2JLetRecBindingBody  String PList[F2JType] PList[F2JBindingParam] F2JType        F2JExpr
+ 
+and F2JApplicationParam = F2JApplicationParamExpr F2JExpr
+                        | F2JApplicationParamType PList[F2JType]
+
+and F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
+
+and F2JRecordItem = F2JRecordItem String F2JExpr
+
+            -- Application
+and F2JExpr = F2JApplication        F2JExpr                  F2JApplicationParam
+            -- Let binding                              ; expr
+            | F2JLet                PList[F2JBindingBody]    F2JExpr
+            -- Let rec binding                          ; expr
+            | F2JLetRec             PList[F2JBindingBody]    F2JExpr
+            -- Lambda function params                   inner expr
+            | F2JLambda             PList[F2JBindingParam]   F2JExpr
+            -- case of
+            | F2JCase               F2JExpr                  PList[F2JCaseAlternative]
+            -- ADT
+            | F2JADT                PList[F2JADTBody]        F2JExpr
+            | F2JRecADT             PList[F2JADTBody]        F2JExpr
+            -- Alias
+            | F2JTypeAlias          F2JType                  F2JType                     F2JExpr
+            -- Tuple
+            | F2JPair               PList[F2JExpr]
+            -- Int literal
+            | F2JIntLiteral         String
+            -- Double literal
+            -- Long literal
+            -- Short literal
+            -- Byte literal
+            -- String Literal
+            | F2JStringLiteral      String
+            | F2JVariable           String
+            | F2JBlock              PList[F2JExpr]
+            | F2JRecord             PList[F2JRecordItem]
+;
+
+-- F2J to Document
+let rec showPListString (ss: PList[String]): Doc=
+	case ss of
+			Nil 		-> NIL
+		|	Cons x xs	-> text x <> text " " <> showPListString xs
+;
+
+let rec showF2JBindingBody (b : F2JBindingBody): Doc =
+    case b of
+        	F2JLetBindingBody name args params rettype expr 	->
+            	text "let " <> text name <> text "[" <> showF2JTypes args "," <> text "]" <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =\n" <> showF2JExpr expr
+     	|  	F2JLetRecBindingBody name args params rettype expr 	->
+     			text "let rec " <> text name <> text "[" <> showF2JTypes args "," <> text "]" <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =\n" <> showF2JExpr expr
+
+-- TODO: Application can not be parsed now
+and showF2JApplicationParam (ap: F2JApplicationParam): Doc=
+	case ap of
+			F2JApplicationParamExpr expr 	->
+				showF2JExpr expr
+		|	F2JApplicationParamType types	->
+				showF2JTypes types " "
+
+-- TODO: Length of CaseAlternative, replace nest 12
+and showF2JCaseAlternative (ca: F2JCaseAlternative): Doc=
+	case ca of
+			F2JCaseAlternative dataname params expr 		->
+				text "\t" <> text dataname <> text " " <> showPListString params <> text "\t\t" <> text "->" <> (nest 12 (line <> showF2JExpr expr)) 
+
+and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Doc=
+	case cas of
+			Nil 						-> NIL
+		|	Cons x xs					->
+			{
+				case xs of
+					Nil 				-> NIL
+				|	Cons y ys 			-> showF2JCaseAlternative x <> line <> text "|" <> showF2JCaseAlternatives (y +> ys)
+			}
+and showF2JExpr (expr: F2JExpr): Doc=
+	text "test"
+;
+
+
+
+
 
 

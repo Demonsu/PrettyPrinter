@@ -61,6 +61,7 @@ let (+>)[A] (a: A)(l: PList[A]): PList[A]=
 	Cons[A] a l
 ;
 
+
 data F2JType = F2JNormalType    String PList[F2JType]
              | F2JPairedType    PList[F2JType]
              | F2JFunctionType  F2JType F2JType
@@ -172,6 +173,88 @@ let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
 
 ;
 
+type Show[A] = A -> Doc;
+
+
+data Maybe[A] = Nothing
+              | Just A
+;
+
+let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
+	case mb of
+			Nothing		-> NIL
+		|	Just x 		-> show x
+;
+
+
+data rec
+    F2JBindingBody = F2JLetBindingBody     String PList[F2JType] PList[F2JBindingParam] Maybe[F2JType] F2JExpr
+                   | F2JLetRecBindingBody  String PList[F2JType] PList[F2JBindingParam] F2JType        F2JExpr
+ 
+and F2JApplicationParam = F2JApplicationParamExpr F2JExpr
+                        | F2JApplicationParamType PList[F2JType]
+
+and F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
+
+and F2JRecordItem = F2JRecordItem String F2JExpr
+
+and F2JExpr = F2JApplication        F2JExpr                  F2JApplicationParam
+            | F2JLet                PList[F2JBindingBody]    F2JExpr
+            | F2JLetRec             PList[F2JBindingBody]    F2JExpr
+            | F2JLambda             PList[F2JBindingParam]   F2JExpr
+            | F2JCase               F2JExpr                  PList[F2JCaseAlternative]
+            | F2JADT                PList[F2JADTBody]        F2JExpr
+            | F2JRecADT             PList[F2JADTBody]        F2JExpr
+            | F2JTypeAlias          F2JType                  F2JType                     F2JExpr
+            | F2JPair               PList[F2JExpr]
+            | F2JIntLiteral         String
+            | F2JStringLiteral      String
+            | F2JVariable           String
+            | F2JBlock              PList[F2JExpr]
+            | F2JRecord             PList[F2JRecordItem]
+;
+
+let rec showPListString (ss: PList[String]): Doc=
+	case ss of
+			Nil 		-> NIL
+		|	Cons x xs	-> text x <> text " " <> showPListString xs
+;
+
+let rec showF2JBindingBody (b : F2JBindingBody): Doc =
+    case b of
+        	F2JLetBindingBody name args params rettype expr 	->
+            	text "let " <> text name <> text "[" <> showF2JTypes args "," <> text "]" <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =\n" <> showF2JExpr expr
+     	|  	F2JLetRecBindingBody name args params rettype expr 	->
+     			text "let rec " <> text name <> text "[" <> showF2JTypes args "," <> text "]" <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =\n" <> showF2JExpr expr
+
+and showF2JApplicationParam (ap: F2JApplicationParam): Doc=
+	case ap of
+			F2JApplicationParamExpr expr 	->
+				showF2JExpr expr
+		|	F2JApplicationParamType types	->
+				showF2JTypes types " "
+
+and showF2JCaseAlternative (ca: F2JCaseAlternative): Doc=
+	case ca of
+			F2JCaseAlternative dataname params expr 		->
+				text "\t" <> text dataname <> text " " <> showPListString params <> text "\t\t" <> text "->" <> (nest 12 (line <> showF2JExpr expr)) 
+
+and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Doc=
+	case cas of
+			Nil 						-> NIL
+		|	Cons x xs					->
+			{
+				case xs of
+					Nil 				-> NIL
+				|	Cons y ys 			-> showF2JCaseAlternative x <> line <> text "|" <> showF2JCaseAlternatives (y +> ys)
+			}
+and showF2JExpr (expr: F2JExpr): Doc=
+	text "test"
+;
+
+
+
+
 
 
 let println (s : String) : Unit = { java.lang.System.out.println(s); () }
@@ -213,6 +296,16 @@ let f2jtype = F2JFunctionType (
 			  				  	F2JNormalType "C" (Nil[F2JType])
 			  				  )	  
 
+;
+let f2jnormaltype = F2JNormalType "String" (Nil[F2JType])
+;
+let f2jtypes = Cons[F2JType] 
+				(F2JNormalType "A" (Nil[F2JType])) 
+				(
+					Cons[F2JType] 
+					(F2JNormalType "B" (Nil[F2JType])) 
+					(Nil[F2JType])
+				)
 ;
 let testF2JType : TestFn = {
     name = "F2JType",
@@ -323,12 +416,35 @@ let testF2JADTBody2 : TestFn = {
         println (showDoc (showF2JADTBody adtbody2) )
     }
 }
-;		
+;
 
-let tests=	(testF2JADTBody2 +>[TestFn]
+let mb= Just[F2JType] f2jtype
+;
+
+let testMaybe : TestFn = {
+    name = "Maybe",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showMaybe[F2JType] showF2JType mb) )
+    }
+}
+;
+
+let f2jbingdingbody = F2JLetBindingBody "PrintWorld" f2jtypes fbingdingparams mb (F2JVariable "test")
+;
+let testF2JLetBindingBody : TestFn = {
+    name = "F2JLetBindingBody",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JBindingBody f2jbingdingbody) )
+    }
+}
+;
+
+let tests=	(testF2JLetBindingBody +>[TestFn]
+			(testMaybe +>[TestFn]
+			(testF2JADTBody2 +>[TestFn]
 		 	(testF2JADTBody1 +>[TestFn]
 			(testF2JBindingParam +>[TestFn] 
-			(testF2JType +>[TestFn] (Nil[TestFn])))))
+			(testF2JType +>[TestFn] (Nil[TestFn])))))))
 ;
 runTests tests
 

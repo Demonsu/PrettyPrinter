@@ -1,0 +1,24 @@
+-- Show definition
+type Show[A] = A -> String;
+
+-- Maybe definition
+
+data Maybe[A] = Nothing
+              | Just A
+;
+let anyToString (s: String): String=
+	s
+;
+
+let maybeToString[A] (tostr : Show[A]) (m : Maybe[A]) : String =
+    case m of
+        Nothing     -> "Nothing"
+     |  Just x      -> "Just \{tostr x}"
+;
+
+let mb= Just[String] "Nothing"
+;
+--let mb1[String]= Just "Nothing"
+--;
+
+maybeToString[String] anyToString mb 

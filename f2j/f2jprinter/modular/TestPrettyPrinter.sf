@@ -22,6 +22,16 @@ let f2jtype = F2JFunctionType (
 			  				  )	  
 
 ;
+let f2jnormaltype = F2JNormalType "String" (Nil[F2JType])
+;
+let f2jtypes = Cons[F2JType] 
+				(F2JNormalType "A" (Nil[F2JType])) 
+				(
+					Cons[F2JType] 
+					(F2JNormalType "B" (Nil[F2JType])) 
+					(Nil[F2JType])
+				)
+;
 let testF2JType : TestFn = {
     name = "F2JType",
     fn   = \(x : Unit) -> {
@@ -138,12 +148,41 @@ let testF2JADTBody2 : TestFn = {
         println (showDoc (showF2JADTBody adtbody2) )
     }
 }
-;		
+;
 
-let tests=	(testF2JADTBody2 +>[TestFn]
+--data Maybe[A] = Nothing
+--              | Just A
+--;		
+let mb= Just[F2JType] f2jtype
+;
+
+let testMaybe : TestFn = {
+    name = "Maybe",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showMaybe[F2JType] showF2JType mb) )
+    }
+}
+;
+
+--data rec
+--    F2JBindingBody = F2JLetBindingBody     String PList[F2JType] PList[F2JBindingParam] Maybe[F2JType] F2JExpr
+--                   | F2JLetRecBindingBody  String PList[F2JType] PList[F2JBindingParam] F2JType        F2JExpr
+let f2jbingdingbody = F2JLetBindingBody "PrintWorld" f2jtypes fbingdingparams mb (F2JVariable "test")
+;
+let testF2JLetBindingBody : TestFn = {
+    name = "F2JLetBindingBody",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JBindingBody f2jbingdingbody) )
+    }
+}
+;
+
+let tests=	(testF2JLetBindingBody +>[TestFn]
+			(testMaybe +>[TestFn]
+			(testF2JADTBody2 +>[TestFn]
 		 	(testF2JADTBody1 +>[TestFn]
 			(testF2JBindingParam +>[TestFn] 
-			(testF2JType +>[TestFn] (Nil[TestFn])))))
+			(testF2JType +>[TestFn] (Nil[TestFn])))))))
 ;
 runTests tests
 
