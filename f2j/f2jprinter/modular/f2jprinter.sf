@@ -168,8 +168,8 @@ data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
 
 let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
 	case f2jadtbody of
-			F2JADTNormalBody ftype alternatives		-> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives (lengF2JType(ftype) + 7)) <> line <> text ";"
-		|	F2JADTRecordBody ftype recorditems		-> (showF2JType ftype) <> (text "= {") <> line <> (showF2JADTRecordItems recorditems) <> line <> text "}" <> line <> text ";"
+			F2JADTNormalBody ftype alternatives		-> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives (lengF2JType(ftype) + 7)) 
+		|	F2JADTRecordBody ftype recorditems		-> (showF2JType ftype) <> (text "= {") <> line <> (showF2JADTRecordItems recorditems) <> line <> text "}" 
  
 and showF2JADTBodys (f2jadtbodys: PList[F2JADTBody]): Doc=
 	case f2jadtbodys of
@@ -240,7 +240,12 @@ let rec showPListString (ss: PList[String]): Doc=
 let rec showF2JBindingBody (b : F2JBindingBody): Doc =
     case b of
         	F2JLetBindingBody name args params rettype expr 	->
-            	text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =\n" <> showF2JExpr expr
+        	{
+        		case args of
+        			Nil 		-> text name <> text " " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        		|	Cons x xs	-> text name <> text "[" <> showF2JTypes (x +> xs) "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        	}
+
      	|  	F2JLetRecBindingBody name args params rettype expr 	->
      			text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =\n" <> showF2JExpr expr
 
@@ -343,7 +348,7 @@ let f2jtype = F2JFunctionType (
 			  				  )	  
 
 ;
-let f2jnormaltype = F2JNormalType "String" (Nil[F2JType])
+let f2jnormaltype = F2JNormalType "F2JType" (Nil[F2JType])
 ;
 let f2jtypes = Cons[F2JType] 
 				(F2JNormalType "A" (Nil[F2JType])) 
@@ -497,7 +502,7 @@ let testF2JLetBindingBodyRec : TestFn = {
 ;
 let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (F2JVariable "s")
 ;
-let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (F2JStringLiteral "type1 -> type2")
+let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (F2JStringLiteral "showF2JType type1 <> showF2JType type2")
 ;
 let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (F2JStringLiteral "showF2JTypes types")
 ;
@@ -512,7 +517,27 @@ let testF2JExprF2JCase : TestFn = {
     }
 }
 ;
-let tests=	(testF2JExprF2JCase 		+>[TestFn]
+let f2jnormaltype1 = F2JNormalType "F2JType" (Nil[F2JType])
+;
+let f2jnormaltype2 = F2JNormalType "Doc" (Nil[F2JType])
+;
+let maybenormal1= Just[F2JType] f2jnormaltype2
+;
+let f2jbindingbody2= F2JLetBindingBody "showF2JType" (Nil[F2JType]) (Cons[F2JBindingParam] (F2JBindingParam "x" f2jnormaltype1) (Nil[F2JBindingParam]) ) maybenormal1  f2jexpr_f2jcase
+;
+let f2jexpr_f2jfull= F2JADT (Cons[F2JADTBody] adtbody1 (Nil[F2JADTBody])) 
+					(F2JLet (Cons[F2JBindingBody] f2jbindingbody2 (Nil[F2JBindingBody])) (F2JVariable "end"))
+;
+let testF2JExprFull : TestFn = {
+    name = "F2JExpr(Full)",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JExpr f2jexpr_f2jfull) )
+    }
+}
+;
+
+let tests=	(testF2JExprFull			+>[TestFn]
+			(testF2JExprF2JCase 		+>[TestFn]
 			(testF2JLetBindingBodyRec 	+>[TestFn]
 			(testF2JLetBindingBody 		+>[TestFn]
 			(testMaybe 					+>[TestFn]
@@ -520,7 +545,7 @@ let tests=	(testF2JExprF2JCase 		+>[TestFn]
 		 	(testF2JADTBody1 			+>[TestFn]
 			(testF2JBindingParam 		+>[TestFn] 
 			(testF2JType 				+>[TestFn] 
-			(Nil[TestFn])))))))))
+			(Nil[TestFn]))))))))))
 ;
 runTests tests
 

@@ -1,0 +1,17 @@
+data Doc = 
+		   Nil
+		|  AAA String Doc
+		|  BBB Int Doc
+;
+let showDoc(doc:  Doc): String=
+	case doc of
+			AAA s x 	-> "AAA"
+		|	_			-> "Default" 
+
+
+;
+
+let testa=  BBB 2 Nil
+;
+
+showDoc testa

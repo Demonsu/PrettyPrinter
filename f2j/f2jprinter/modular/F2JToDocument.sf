@@ -124,8 +124,8 @@ data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
 
 let rec showF2JADTBody (f2jadtbody: F2JADTBody): Doc=
 	case f2jadtbody of
-			F2JADTNormalBody ftype alternatives		-> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives (lengF2JType(ftype) + 7)) <> line <> text ";"
-		|	F2JADTRecordBody ftype recorditems		-> (showF2JType ftype) <> (text "= {") <> line <> (showF2JADTRecordItems recorditems) <> line <> text "}" <> line <> text ";"
+			F2JADTNormalBody ftype alternatives		-> (showF2JType ftype) <> (text "= ") <> (showF2JADTAlternatives alternatives (lengF2JType(ftype) + 7)) 
+		|	F2JADTRecordBody ftype recorditems		-> (showF2JType ftype) <> (text "= {") <> line <> (showF2JADTRecordItems recorditems) <> line <> text "}" 
  
 and showF2JADTBodys (f2jadtbodys: PList[F2JADTBody]): Doc=
 	case f2jadtbodys of
@@ -216,7 +216,12 @@ let rec showPListString (ss: PList[String]): Doc=
 let rec showF2JBindingBody (b : F2JBindingBody): Doc =
     case b of
         	F2JLetBindingBody name args params rettype expr 	->
-            	text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =\n" <> showF2JExpr expr
+        	{
+        		case args of
+        			Nil 		-> text name <> text " " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        		|	Cons x xs	-> text name <> text "[" <> showF2JTypes (x +> xs) "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        	}
+
      	|  	F2JLetRecBindingBody name args params rettype expr 	->
      			text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =\n" <> showF2JExpr expr
 
@@ -259,8 +264,10 @@ and showF2JExpr (expr: F2JExpr): Doc=
 	case expr of
 		-- Parser of application still not be done
 			F2JApplication expr apparm 				-> showF2JExpr expr <> showF2JApplicationParam apparm
+		-- One let xx; One F2JLet; PList for let xx and yy;
 		|	F2JLet bindingbodys f2jexpr 			-> text "let " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		-- TODO: text ";" or "and" depends on the next f2jexpr
+		-- Support: case default
 		|	F2JLetRec bindingbodys f2jexpr 			-> text "let rec " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		|	F2JLambda bindingparams f2jexpr 		-> text "\\" <> showF2JBindingParams bindingparams <> text " -> " <> showF2JExpr expr
 		-- Note: f2jexpr here should not write too much code
