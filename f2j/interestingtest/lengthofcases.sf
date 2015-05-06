@@ -1,0 +1,43 @@
+-- list definition
+
+data PList[A] = Nil
+              | Cons A (PList[A])
+;
+-- F2J definition
+data F2JCaseAlternative = F2JCaseAlternative String PList[String] 
+;
+
+let rec lengOfPListString (strs: PList[String]): Int=
+    case strs of
+        Cons x xs -> length(x) + 1 + lengOfPListString(xs)
+    |   Nil       -> 0
+
+;
+let max (a: Int) (b: Int) : Int=
+    if (a>b) then a else b
+;
+let rec lengOfF2JCaseAlternative (ca: F2JCaseAlternative): Int=
+    case ca of 
+            F2JCaseAlternative dataname params  -> (length (dataname)) + 1 + (lengOfPListString params)
+    
+and
+lengOfF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Int=
+    case cas of
+            Nil         -> 0
+        |   Cons x xs   -> max (lengOfF2JCaseAlternative x) (lengOfF2JCaseAlternatives xs)
+;
+let strings= Cons[String] "abc" (Cons[String] "efg" (Nil[String]))
+;
+let casealternative1= F2JCaseAlternative "F2JType" strings
+;
+let casealternative2= F2JCaseAlternative "Helloasdasd" strings
+;
+let rec getIndentation (my: Int) (m: Int): String=
+    if (m - my) >= 0 then "tab".concat(getIndentation my (m-4))
+    else ""
+; 
+--lengOfPListString strings
+--lengOfF2JCaseAlternative casealternative
+--max 1 2
+--lengOfF2JCaseAlternatives (Cons[F2JCaseAlternative] casealternative1 (Cons[F2JCaseAlternative] casealternative2 (Nil[F2JCaseAlternative])))
+getIndentation 10 20

@@ -119,6 +119,18 @@ let testF2JADTBody1 : TestFn = {
     }
 }
 ;
+
+--Lambda \(a : A) -> 1
+let f2jlambda= F2JLambda fbingdingparams (F2JStringLiteral "1")
+;
+let testF2JLambda : TestFn = {
+    name = "F2JLambda",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JExpr f2jlambda) )
+    }
+}
+;
+
 --data F2JADTRecordItem = F2JADTRecordItem String F2JType
 let recorditem1= F2JADTRecordItem "name" (F2JNormalType "Demonsu" (Nil[F2JType]))
 ;
@@ -236,8 +248,9 @@ let tests=	(testF2JExprFull			+>[TestFn]
 			(testF2JADTBody2 			+>[TestFn]
 		 	(testF2JADTBody1 			+>[TestFn]
 			(testF2JBindingParam 		+>[TestFn] 
+			(testF2JLambda				+>[TestFn]
 			(testF2JType 				+>[TestFn] 
-			(Nil[TestFn]))))))))))
+			(Nil[TestFn])))))))))))
 ;
 runTests tests
 

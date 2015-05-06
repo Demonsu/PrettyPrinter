@@ -1,0 +1,47 @@
+data PList[A] = Nil
+              | Cons A (PList[A])
+;
+
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+
+
+data F2JType = F2JNormalType    String PList[F2JType]
+             | F2JPairedType    PList[F2JType]
+             | F2JFunctionType  F2JType F2JType
+;
+
+-- length of F2JNormalType
+
+let lengF2JType (ftype: F2JType): Int=
+	case ftype of
+			F2JNormalType name types -> length(name)
+		|	F2JPairedType types		 -> 4
+		|	F2JFunctionType t1 t2    -> 4
+;
+
+-- F2JType to Document
+
+let rec showF2JType (ftype: F2JType): Doc=
+	case ftype of
+			F2JNormalType name params -> 
+			{
+				case params of
+					Nil 			  -> text name
+				|	Cons x xs		  -> text name <> text "[" <> (showF2JTypes (x +> xs) ",") <> text "]"
+				
+			}
+		|	F2JPairedType types		  -> text "(" <> (showF2JTypes types ",") <> text ")"
+		|	F2JFunctionType from to   -> showF2JType from <> text " -> " <> showF2JType to
+and
+showF2JTypes (ftypelist: PList[F2JType]) (decollator: String): Doc =
+	case ftypelist of
+			Nil						  -> NIL
+		|	Cons x xs				  -> 
+			{
+				case xs of
+					Nil 			  -> showF2JType x
+				|	Cons y ys 		  -> showF2JType x <> (text decollator) <> (showF2JTypes (y +> ys) decollator)
+			}
+;

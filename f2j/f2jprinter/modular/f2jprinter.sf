@@ -223,6 +223,30 @@ and F2JExpr = F2JApplication        F2JExpr                  F2JApplicationParam
             | F2JRecord             PList[F2JRecordItem]
 ; 
 
+let max (a: Int) (b: Int) : Int=
+    if (a>b) then a else b
+;
+
+let rec lengOfPListString (strs: PList[String]): Int=
+    case strs of
+        Cons x xs -> length(x) + 1 + lengOfPListString(xs)
+    |   Nil       -> 0
+
+;
+
+let rec lengOfF2JCaseAlternative (ca: F2JCaseAlternative): Int=
+    case ca of 
+            F2JCaseAlternative dataname params expr -> (length (dataname)) + 1 + (lengOfPListString params)
+    
+and
+lengOfF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Int=
+    case cas of
+            Nil         -> 0
+        |   Cons x xs   -> max (lengOfF2JCaseAlternative x) (lengOfF2JCaseAlternatives xs)
+;
+
+
+
 let rec showF2JRecordItem (record: F2JRecordItem): Doc=
 	line <> text "-- F2JRecordItem is TODO" <> line
 
@@ -268,27 +292,27 @@ and showF2JApplicationParam (ap: F2JApplicationParam): Doc=
 		|	F2JApplicationParamType types	->
 				showF2JTypes types " "
 
-and showF2JCaseAlternative (ca: F2JCaseAlternative): Doc=
+and showF2JCaseAlternative (ca: F2JCaseAlternative) (myLen:Int) (maxLen: Int): Doc=
 	case ca of
 			F2JCaseAlternative dataname params expr 		->
-				text "\t" <> text dataname <> text " " <> showPListString params <> text "\t\t" <> text "->" <> (nest 12 (line <> showF2JExpr expr)) 
+				text "\t" <> text dataname <> text " " <> showPListString params <> text (space (maxLen - myLen + 2)) <> text "->" <> (nest 12 (line <> showF2JExpr expr)) 
 
-and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Doc=
+and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]) (maxLen: Int): Doc=
 	case cas of
 			Nil 						-> NIL
 		|	Cons x xs					->
 			{
 				case xs of
-					Nil 				-> showF2JCaseAlternative x
-				|	Cons y ys 			-> showF2JCaseAlternative x <> line <> text "|" <> showF2JCaseAlternatives (y +> ys)
+					Nil 				-> showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen
+				|	Cons y ys 			-> (showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen) <> line <> text "|" <> (showF2JCaseAlternatives (y +> ys) maxLen)
 			}
 and showF2JExpr (expr: F2JExpr): Doc=
 	case expr of
 			F2JApplication expr apparm 				-> showF2JExpr expr <> showF2JApplicationParam apparm
 		|	F2JLet bindingbodys f2jexpr 			-> text "let " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		|	F2JLetRec bindingbodys f2jexpr 			-> text "let rec " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
-		|	F2JLambda bindingparams f2jexpr 		-> text "\\" <> showF2JBindingParams bindingparams <> text " -> " <> showF2JExpr expr
-		| 	F2JCase f2jexpr casealternatives  		-> text "case " <> showF2JExpr f2jexpr <> text " of" <> line <> showF2JCaseAlternatives casealternatives
+		|	F2JLambda bindingparams f2jexpr 		-> text "\\" <> showF2JBindingParams bindingparams <> text " -> " <> showF2JExpr f2jexpr
+		| 	F2JCase f2jexpr casealternatives  		-> text "case " <> showF2JExpr f2jexpr <> text " of" <> line <> (showF2JCaseAlternatives casealternatives (lengOfF2JCaseAlternatives casealternatives))
 		|	F2JADT f2jadtbodys f2jexpr 				-> text "Data " <> showF2JADTBodys f2jadtbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		| 	F2JRecADT f2jadtbodys f2jexpr 			-> text "Data " <> showF2JADTBodys f2jadtbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		|	F2JTypeAlias type1 type2 f2jexpr 		-> text "type " <> showF2JType type1 <> text "= " <> showF2JType type2 <> showF2JExpr f2jexpr
@@ -439,6 +463,17 @@ let testF2JADTBody1 : TestFn = {
     }
 }
 ;
+
+let f2jlambda= F2JLambda fbingdingparams (F2JStringLiteral "1")
+;
+let testF2JLambda : TestFn = {
+    name = "F2JLambda",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JExpr f2jlambda) )
+    }
+}
+;
+
 let recorditem1= F2JADTRecordItem "name" (F2JNormalType "Demonsu" (Nil[F2JType]))
 ;
 let recorditem2= F2JADTRecordItem "age" (F2JNormalType "24" (Nil[F2JType]))
@@ -544,8 +579,9 @@ let tests=	(testF2JExprFull			+>[TestFn]
 			(testF2JADTBody2 			+>[TestFn]
 		 	(testF2JADTBody1 			+>[TestFn]
 			(testF2JBindingParam 		+>[TestFn] 
+			(testF2JLambda				+>[TestFn]
 			(testF2JType 				+>[TestFn] 
-			(Nil[TestFn]))))))))))
+			(Nil[TestFn])))))))))))
 ;
 runTests tests
 
