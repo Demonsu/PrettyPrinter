@@ -1,0 +1,13 @@
+data PolyList[A] = Nil
+			| 	Cons A (PolyList[A]);
+
+--type CharList = PolyList[Char];
+
+let rec readPolyList(s: String): PolyList[Char] =
+	if s.length() == 0 then (Nil[Char])
+	else (Cons[Char] 'a' (readPolyList("")));
+
+
+
+--readTestCases("hello")
+readPolyList "hello"

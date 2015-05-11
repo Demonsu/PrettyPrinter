@@ -1,6 +1,7 @@
 {-#
     INCLUDE "F2JToDocument.sf"
     INCLUDE "TestLib.sf"
+    INCLUDE "f2j_parser.sf"
 #-}
 
 
@@ -115,7 +116,7 @@ let adtbody1 = F2JADTNormalBody
 let testF2JADTBody1 : TestFn = {
     name = "F2JADTBody  normal",
     fn   = \(x : Unit) -> {
-        println (showDoc (showF2JADTBody adtbody1) )
+        println (showDoc (showF2JADTBody adtbody1 7) )
     }
 }
 ;
@@ -157,7 +158,7 @@ let adtbody2 = F2JADTRecordBody
 let testF2JADTBody2 : TestFn = {
     name = "F2JADTBody  record",
     fn   = \(x : Unit) -> {
-        println (showDoc (showF2JADTBody adtbody2) )
+        println (showDoc (showF2JADTBody adtbody2 7) )
     }
 }
 ;
@@ -199,6 +200,26 @@ let testF2JLetBindingBodyRec : TestFn = {
     }
 }
 ;
+--F2JRecADT             PList[F2JADTBody]        F2JExpr
+let f2jexpr_f2jadt= F2JADT (Cons[F2JADTBody] adtbody1 (Cons[F2JADTBody] adtbody2 (Nil[F2JADTBody]))) (F2JVariable "test")
+;
+let testF2JExprF2JADT : TestFn = {
+    name = "F2JExpr(F2JADT)",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JExpr f2jexpr_f2jadt) )
+    }
+}
+;
+let f2jexpr_f2jrecadt= F2JRecADT (Cons[F2JADTBody] adtbody1 (Cons[F2JADTBody] adtbody1 (Nil[F2JADTBody]))) (F2JVariable "test")
+;
+let testF2JExprF2JRecADT : TestFn = {
+    name = "F2JExpr(F2JRecADT)",
+    fn   = \(x : Unit) -> {
+        println (showDoc (showF2JExpr f2jexpr_f2jrecadt) )
+    }
+}
+;
+
 --F2JCase               F2JExpr                  PList[F2JCaseAlternative]
 --F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
 let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (F2JVariable "s")
@@ -242,6 +263,8 @@ let testF2JExprFull : TestFn = {
 
 let tests=	(testF2JExprFull			+>[TestFn]
 			(testF2JExprF2JCase 		+>[TestFn]
+			(testF2JExprF2JRecADT		+>[TestFn]	
+			(testF2JExprF2JADT 			+>[TestFn]
 			(testF2JLetBindingBodyRec 	+>[TestFn]
 			(testF2JLetBindingBody 		+>[TestFn]
 			(testMaybe 					+>[TestFn]
@@ -250,7 +273,7 @@ let tests=	(testF2JExprFull			+>[TestFn]
 			(testF2JBindingParam 		+>[TestFn] 
 			(testF2JLambda				+>[TestFn]
 			(testF2JType 				+>[TestFn] 
-			(Nil[TestFn])))))))))))
+			(Nil[TestFn])))))))))))))
 ;
 runTests tests
 

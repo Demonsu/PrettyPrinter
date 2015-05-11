@@ -1,0 +1,2454 @@
+
+
+type Thunk[A] = Unit -> A;
+
+let invoke[A] (t : Thunk[A]) : A =
+    t ();
+type Show[A] = A -> String;
+type Eq[A] = A -> A -> Bool;
+
+let charEq (a : Char) (b : Char) : Bool = a.equals(b);
+let intEq (a : Int) (b : Int) : Bool = a.equals(b);
+let boolEq (a : Bool) (b : Bool) : Bool = a.equals(b);
+let unitEq (a : Unit) (b : Unit) : Bool = a == b;
+let stringEq (a : String) (b : String) : Bool = a.equals(b);
+
+let charToString (a : Char) : String = a.toString();
+let intToString (a : Int) : String = a.toString();
+let boolToString (a : Bool) : String = a.toString();
+let unitToString (a : Unit) : String = "()";
+let stringToString (a : String) : String = a;
+
+data Maybe[A] = Nothing
+              | Just A
+              ;
+
+let maybeToString[A] (tostr : Show[A]) (m : Maybe[A]) : String =
+    case m of
+        Nothing     -> "Nothing"
+     |  Just x      -> "Just \{tostr x}";
+
+let maybeEq[A] (eq : Eq[A]) (a : Maybe[A]) (b : Maybe[A]) : Bool =
+    case a of
+        Nothing     ->  {
+            case b of
+                Nothing     -> True
+             |  Just _      -> False
+        }
+     |  Just xa     ->  {
+            case b of
+                Nothing     -> False
+             |  Just xb     -> xa `eq` xb
+        };
+
+data PList[A] = Nil
+              | Cons A (Thunk[PList[A]])
+              ;
+
+let rec nats (beg : Int) : PList[Int] =
+    Cons[Int] beg (\(__ : Unit) -> nats (beg+1));
+
+
+let singleton[A] (x : A) : PList[A] =
+    Cons[A] x (\(__: Unit) -> (Nil[A]));
+
+let rec map[A, B] (f : A -> B) (l : PList[A]) : PList[B] =
+    case l of
+        Nil             ->      Nil[B]
+     |  Cons x xs       ->      Cons[B] (f x) (\(__ : Unit) -> (map[A, B] f (invoke[PList[A]] xs)));
+
+let rec foldl[A, B] (f : B -> A -> B) (z : B) (l : PList[A]) : B =
+    case l of
+        Nil             ->      z
+     |  Cons x xs       ->      foldl[A, B] f (f z x) (invoke[PList[A]] xs);
+
+
+let foldr[A, B] (f : A -> B -> B) (z : B) (l : PList[A]) : B =
+    let rec inner (s : PList[A]) (k : B -> B) : B =
+        case s of
+            Nil         -> k z
+         |  Cons x xs   -> inner (invoke[PList[A]] xs) (\(y : B) -> k (f x y));
+    inner l (\(x : B) -> x);
+
+
+let join[A] (l : PList[A]) (j : A) : PList[A] =
+    let rec inner[A] (l : PList[A]) (j : A) : PList[A] =
+        case l of
+            Nil         -> (Nil[A])
+         |  Cons x xs   -> (Cons[A] j (\(__ : Unit) ->
+                                (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j))));
+    case l of
+        Nil         -> (Nil[A])
+     |  Cons x xs   -> (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j));
+
+let (+>)[A] (a : A) (l : PList[A]) : PList[A] =
+    Cons[A] a (\(__ : Unit) -> l);
+
+let rec concat2[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    case a of
+        Nil         ->  b
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (concat2[A] (invoke[PList[A]] xs) b));
+
+let rec lazyconcat2[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    case a of
+        Nil         ->  (invoke[PList[A]] b)
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (lazyconcat2[A] (invoke[PList[A]] xs) b));
+
+let (++)[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    concat2[A] a b;
+
+let (+~)[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    lazyconcat2[A] a b;
+
+let rec concat[A] (l : PList[PList[A]]) : PList[A] =
+    case l of
+        Nil         ->  Nil[A]
+     |  Cons x xs   ->  x +~[A] (\(__ : Unit) -> (concat[A] (invoke[PList[PList[A]]] xs)));
+
+let rec len[A] (l : PList[A]) : Int =
+    case l of
+        Nil         ->  0
+     |  Cons _ xs   ->  1 + (len[A] (invoke[PList[A]] xs));
+
+let isempty[A] (l : PList[A]) : Bool =
+    case l of
+        Nil         -> True
+     |  Cons _ _    -> False;
+
+let first[A] (l : PList[A]) : Maybe[A] =
+    case l of
+        Nil         -> Nothing[A]
+     |  Cons x _    -> Just[A] x;
+
+let rest[A] (l : PList[A]) : Maybe[PList[A]] =
+    case l of
+        Nil         -> Nothing[PList[A]]
+     |  Cons _ xs   -> Just[PList[A]] (invoke[PList[A]] xs);
+
+let rec take[A] (n : Int) (l : PList[A]) : PList[A] =
+    if n <= 0 then
+        (Nil[A])
+    else
+        case l of
+            Nil         ->  Nil[A]
+         |  Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (take[A] (n-1) (invoke[PList[A]] xs)));
+
+let rec zip[A, B] (a : PList[A]) (b : PList[B]) : PList[(A, B)] =
+    case a of
+        Nil         -> Nil[(A, B)]
+     |  Cons xa xsa ->
+            case b of
+                Nil         -> Nil[(A, B)]
+             |  Cons xb xsb ->
+                    Cons[(A, B)] (xa, xb) (\(__ : Unit) -> zip[A, B] (invoke[PList[A]] xsa) (invoke[PList[B]] xsb));
+
+let pListToString[A] (tostr : A -> String) (l : PList[A]) : String =
+    type StringBuilder = java.lang.StringBuilder;
+
+    let inner = foldl[String, StringBuilder]
+                    (\(b : StringBuilder) (a : String) -> b.append(a))
+                    (new java.lang.StringBuilder("["))
+                    (join[String] (map[A, String] tostr l) ", ");
+
+    inner.append("]").toString();
+
+let rec pListEq[A] (eq : Eq[A]) (a : PList[A]) (b : PList[A]) : Bool =
+    case a of
+        Nil         -> { case b of Nil -> True | Cons _ _ -> False }
+     |  Cons ax axs ->
+            case b of
+                Nil         -> False
+             |  Cons bx bxs -> if eq ax bx then
+                                    pListEq[A] eq (invoke[PList[A]] axs) (invoke[PList[A]] bxs)
+                               else False;
+
+let println (s : String) : Unit = { java.lang.System.out.println(s); () };
+let print (s : String) : Unit = { java.lang.System.out.print(s); () };
+
+type TestFn = {
+    name : String,
+    fn   : Unit -> Unit
+};
+
+type TestSuite = {
+    name : String,
+    fns  : PList[TestFn]
+};
+
+let runTest (test : TestFn) : Unit = {
+    let testingPrefix : String = "\u001b[31;1mtesting\u001b[0m\t";
+    println testingPrefix.concat(test.name).concat(" :");
+    test.fn ();
+    println "\t...passed"
+};
+
+let runTests (tests : PList[TestFn]) : Unit =
+    foldl[TestFn, Unit]
+        (\(__ : Unit) (fn : TestFn) -> runTest fn) () tests;
+
+let runTestSuite (suite : TestSuite) : Unit = {
+    println "\n\t\u001b[32;1mRunning\u001b[37;1m ".concat(suite.name).concat("\u001b[0m ...\n");
+    println "Running ".concat((len[TestFn] suite.fns).toString()).concat(" tests");
+    runTests suite.fns
+};
+
+let runTestSuites (suites : PList[TestSuite]) : Unit =
+    foldl[TestSuite, Unit]
+        (\(__ : Unit) (suite : TestSuite) -> runTestSuite suite) () suites;
+
+
+let assert (b : Bool) =
+    if b then
+        ()
+    else
+        error[Unit] "Assert failed!";
+
+let assertEq[A] (eq : Eq[A]) (show : Show[A]) (src : A) (expected : A) =
+    if src `eq` expected then
+        ()
+    else
+        error[Unit] "Assert failed!\n\tExpecting: \{show expected}\n\tBut Found: \{show src}";
+
+
+type PString = PList[Char];
+
+let pStringToString (l : PString) : String =
+    (foldl[Char, java.lang.StringBuilder]
+        (\(b : java.lang.StringBuilder) (a : Char) -> b.append(a))
+        (new java.lang.StringBuilder( ))
+        l).toString();
+
+let pStringFromString (str : String) : PString =
+    let rec inner (str : String) (idx : Int) : PString =
+        if idx `intEq` str.length() then
+            (Nil[Char])
+        else
+            (Cons[Char] str.charAt(idx) (\(__ : Unit) -> (inner str (idx+1))));
+    inner str 0;
+
+let rec pStringEq (a : PString) (b : PString) : Bool =
+    pListEq[Char] charEq a b;
+
+let rec charin (c : Char) (str : PString) : Bool =
+    case str of
+        Nil         ->      False
+     |  Cons x xs   ->      if x.equals(c) then
+                                True
+                            else
+                                (charin c (invoke[PString] xs));
+
+let testListEqual : TestFn = {
+    name = "pListEq",
+    fn   = \(__ : Unit) ->
+        assertEq[PList[Int]]
+            (pListEq[Int] intEq)
+            (pListToString[Int] intToString)
+            (singleton[Int] 1)
+            (singleton[Int] 1)
+};
+
+let testMap : TestFn = {
+    name = "map",
+    fn   = \(__ : Unit) ->
+        assertEq[PList[Char]]
+            (pListEq[Char] charEq)
+            pStringToString
+            (map[Char, Char] (\(c : Char) -> 'm') (pStringFromString "hello"))
+            (pStringFromString "mmmmm")
+};
+
+let testFoldr : TestFn = {
+    name = "foldr",
+    fn   = \(__ : Unit) ->
+        assertEq[Int]
+            intEq
+            intToString
+            (foldr[Int,Int] (\(a : Int) (b : Int) -> a + b) 0 (take[Int] 5 (nats 1)))
+            15
+};
+
+let testFoldl : TestFn = {
+    name = "foldl",
+    fn   = \(__ : Unit) ->
+        assertEq[Int]
+            intEq
+            intToString
+            (foldl[Int,Int] (\(b : Int) (a : Int) -> a + b) 0 (take[Int] 5 (nats 1)))
+            15
+};
+
+let testUtilitiesSuite : TestSuite = {
+    name = "Test Utilities",
+    fns  = testListEqual
+                +>[TestFn] (testMap
+                +>[TestFn] (testFoldr
+                +>[TestFn] (testFoldl
+                +>[TestFn] (Nil[TestFn]))))
+};
+
+
+data Result[S, E] = Ok S
+                  | Err E
+                  ;
+
+let resultEq[S, E] (eqs : Eq[S]) (eqe : Eq[E]) (a : Result[S, E]) (b : Result[S, E]) : Bool =
+    case a of
+        Ok s1 -> {
+            case b of
+                Ok s2 -> eqs s1 s2
+             |  Err _ -> False
+        }
+     |  Err e1 -> {
+            case b of
+                Ok _   -> False
+             |  Err e2 -> eqe e1 e2
+        };
+
+let resultToString[S, E] (sToStr : Show[S]) (eToStr : Show[E]) (r : Result[S, E]) : String =
+    case r of
+        Ok s    -> "Ok \{sToStr s}"
+     |  Err e   -> "Err \{eToStr e}";
+data Order = Equals
+           | GreaterThan
+           | LessThan
+           ;
+
+type State[S, A] = S -> (A, S);
+
+data Message = SysUnexpected String
+             | Unexpected String
+             | Expect String
+             | Message String
+             ;
+
+let messageToString (e : Message) : String =
+    case e of
+        SysUnexpected s     -> "SysUnexpected \{s}"
+     |  Unexpected s        -> "Unexpected \{s}"
+     |  Expect s            -> "Expect \{s}"
+     |  Message s           -> "Message \{s}";
+
+type SourceName   = String;
+type Line         = Int;
+type Column       = Int;
+
+data SourcePos = SourcePos SourceName Line Column;
+
+let newSourcePos (name : SourceName) (line : Line) (column : Column) : SourcePos =
+    SourcePos name line column;
+
+let initialPos (s : SourceName) : SourcePos =
+    SourcePos s 1 1;
+
+let sourceName (p : SourcePos) : SourceName =
+    case p of
+        SourcePos name _ _ -> name;
+
+let sourceLine (p : SourcePos) : Line =
+    case p of
+        SourcePos _ line _ -> line;
+
+let sourceColumn (p : SourcePos) : Column =
+    case p of
+        SourcePos _ _ c -> c;
+
+let incSourceLine (p : SourcePos) (n : Line) : SourcePos =
+    case p of
+        SourcePos name line col -> SourcePos name (line+n) col;
+
+let incSourceColumn (p : SourcePos) (n : Column) : SourcePos =
+    case p of
+        SourcePos name line col -> SourcePos name line (col+n);
+
+let updatePosChar (p : SourcePos) (c : Char) : SourcePos =
+    if c `charEq` '\n' then
+        case p of
+            SourcePos name line col -> SourcePos name (line+1) 1
+    else
+        incSourceColumn p 1;
+
+let updatePosPString (p : SourcePos) (s : PString) : SourcePos =
+    foldl[Char, SourcePos] updatePosChar p s;
+
+let sourcePosToString (p : SourcePos) : String =
+    case p of
+        SourcePos name line col ->
+            "\"\{name}\" (\{line}:\{col})";
+
+let sourcePosCompare (p1 : SourcePos) (p2 : SourcePos) : Order =
+    case p1 of
+        SourcePos _ line1 col1 ->
+            case p2 of
+                SourcePos _ line2 col2 ->
+                    if line1 < line2 then LessThan
+                    else if line1 > line2 then GreaterThan
+                    else if col1 < col2 then LessThan
+                    else if col1 > col2 then GreaterThan
+                    else Equals;
+
+let sourcePosEq (p1 : SourcePos) (p2 : SourcePos) : Bool =
+    case p1 `sourcePosCompare` p2 of
+        Equals      -> True
+     |  GreaterThan -> False
+     |  LessThan    -> False;
+
+data ParseError = ParseError SourcePos PList[Message];
+
+let errorPos (p : ParseError) : SourcePos =
+    case p of
+        ParseError pos _ -> pos;
+
+let errorMessages (p : ParseError) : PList[Message] =
+    case p of
+        ParseError _ msgs -> msgs;
+
+let errorIsUnknown (p : ParseError) : Bool =
+    case p of
+        ParseError _ msgs -> isempty[Message] msgs;
+
+let newErrorUnknown (pos : SourcePos) : ParseError =
+    ParseError pos (Nil[Message]);
+
+let newErrorMessage (msg : Message) (pos : SourcePos) =
+    ParseError pos (singleton[Message] msg);
+
+let addErrorMessage (msg : Message) (err : ParseError) =
+    case err of
+        ParseError pos msgs -> ParseError pos (msg +>[Message] msgs);
+
+let mergeError (err1 : ParseError) (err2 : ParseError) : ParseError =
+    case err1 of
+        ParseError pos1 msgs1 ->
+            case err2 of
+                ParseError pos2 msgs2 ->
+                    if isempty[Message] msgs1 then err2
+                    else if isempty[Message] msgs2 then err1
+                    else
+                        case pos1 `sourcePosCompare` pos2 of
+                            Equals      ->  ParseError pos1 (msgs1 ++[Message] msgs2)
+                         |  GreaterThan ->  err1
+                         |  LessThan    ->  err2;
+
+let parseErrorToString (err : ParseError) : String =
+    case err of
+        ParseError pos msgs ->
+            "\{sourcePosToString pos}:\{pListToString[Message] messageToString msgs}";
+
+
+type ParsePos = (SourcePos, SourcePos);
+
+let parseBeginPos (p : ParsePos) : SourcePos =
+    p._1;
+
+let parseEndPos (p : ParsePos) : SourcePos =
+    p._2;
+
+let parsePosEq (a : ParsePos) (b : ParsePos) : Bool =
+    (a._1 `sourcePosEq` b._1) && (a._2 `sourcePosEq` b._2);
+
+let parsePosToString (a : ParsePos) : String =
+    "\{sourcePosToString a._1}..\{sourcePosToString a._2}";
+
+
+type ParseResult[A] = (A, ParsePos);
+
+let parseResultValue[A] (r : ParseResult[A]) : A =
+    r._1;
+
+let parseResultPos[A] (r : ParseResult[A]) : ParsePos =
+    r._2;
+
+let parseResultEq[A] (eq : Eq[A]) (a : ParseResult[A]) (b : ParseResult[A]) : Bool =
+    (a._1 `eq` b._1) && (a._2 `parsePosEq` b._2);
+
+let parseResultToString[A] (str : Show[A]) (res : ParseResult[A]) : String =
+    "(\{str res._1}, \{parsePosToString res._2})";
+
+type ParseInput = (SourcePos, PString);
+
+let newParseInput (pos : SourcePos) (src : PString) : ParseInput =
+    (pos, src);
+
+let parseInputPos (inp : ParseInput) : SourcePos =
+    inp._1;
+
+let parseInputData (inp : ParseInput) : PString =
+    inp._2;
+
+let parseInputInit (src : PString) : ParseInput =
+    (initialPos "<default>", src);
+
+let parseInputInitWithName (name : String) (src : PString) : ParseInput =
+    (initialPos "<default>", src);
+
+let parseInputEq (a : ParseInput) (b : ParseInput) : Bool =
+    (a._1 `sourcePosEq` b._1) && (a._2 `pStringEq` b._2);
+
+let parseInputToString (a : ParseInput) : String =
+    "\"\{pStringToString a._2}\" @ \"\{sourcePosToString a._1}\"";
+
+type ParseContext[A] = (A, ParseInput);
+
+let newParseContext[A] (a : A) (inp : ParseInput) : ParseContext[A] =
+    (a, inp);
+
+let parseContextResult[A] (c : ParseContext[A]) : A =
+    c._1;
+
+let parseContextInput[A] (c : ParseContext[A]) : ParseInput =
+    c._2;
+
+let parseContextEq[A] (eq : Eq[A]) (a : ParseContext[A]) (b : ParseContext[A]): Bool =
+    (eq a._1 b._1) && (a._2 `parseInputEq` b._2);
+
+let parseContextToString[A] (str : Show[A]) (c : ParseContext[A]) : String =
+    "(\{str c._1}, \{parseInputToString c._2})";
+
+
+type ParseOutput[A] = PList[ParseContext[A]];
+
+let parseOutputEq[A] (eq : Eq[A]) (a : ParseOutput[A]) (b : ParseOutput[A]) : Bool =
+    pListEq[ParseContext[A]]
+        (parseContextEq[A] eq)
+        a b;
+
+let parseOutputToString[A] (str : Show[A]) (res : ParseOutput[A]) : String =
+    pListToString[ParseContext[A]]
+        (parseContextToString[A] str)
+        res;
+
+type Parser[A] = ParseInput -> ParseOutput[A];
+
+let parseString[A] (p : Parser[A]) (src : String) : ParseOutput[A] =
+    p (parseInputInit (pStringFromString src));
+
+let parsePString[A] (p : Parser[A]) (src : PString) : ParseOutput[A] =
+    p (parseInputInit src);
+
+let parsePStringWithName[A] (p : Parser[A]) (name : String) (src : PString) : ParseOutput[A] =
+    p (parseInputInitWithName name src);
+
+let parseStringWithName[A] (p : Parser[A]) (name : String) (src : String) : ParseOutput[A] =
+    p (parseInputInitWithName name (pStringFromString src));
+
+
+let result[V] (value : V) : Parser[V] =
+    \(inp : ParseInput) -> singleton[ParseContext[V]] (newParseContext[V] value inp);
+
+let zero[V] : Parser[V] =
+    \(inp : ParseInput) -> Nil[ParseContext[V]];
+
+let item : Parser[Char] =
+    \(inp : ParseInput) ->
+        case parseInputData inp of
+            Nil         ->      Nil[ParseContext[Char]]
+          | Cons c xs   ->
+                singleton[ParseContext[Char]]
+                    (newParseContext[Char] c (newParseInput (updatePosChar (parseInputPos inp) c) (invoke[PString] xs)));
+
+
+let bind[A, B] (p : Parser[A]) (f : A -> Parser[B]) : Parser[B] =
+    \(inp : ParseInput) ->
+        concat[ParseContext[B]]
+              (map[ParseContext[A], ParseOutput[B]]
+                  (\(v : ParseContext[A]) -> f (parseContextResult[A] v) (parseContextInput[A] v)) (p inp));
+
+let (>>=)[A, B] (p : Parser[A]) (f : A -> Parser[B]) : Parser[B] =
+    bind[A, B] p f;
+
+let (>>)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[B] =
+    p >>=[A, B] (\(__ : A) -> q);
+
+let (<*)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[A] =
+    p >>=[A, A] (\(a : A) ->
+    q >>=[B, A] (\(__ : B) ->
+    result[A] a));
+
+let (*>)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[B] =
+    p >>[A, B] q;
+
+let using[A, B] (p : Parser[A]) (f : A -> B) : Parser[B] =
+    bind[A, B] p (\(a : A) -> result[B] (f a));
+
+let (<$>)[A, B] (p : Parser[A]) (f : A -> B) : Parser[B] =
+    using[A, B] p f;
+
+let ($>)[A, B] (p : Parser[A]) (b : B) : Parser[B] =
+    using[A, B] p (\(__ : A) -> b);
+
+let seq[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[(A, B)] =
+    bind[A, (A, B)] p (\(x : A) ->
+    bind[B, (A, B)] q (\(y : B) ->
+    result[(A, B)] (x, y)));
+
+let choice[A] (p : Parser[A]) (q : Parser[A]) : Parser[A] =
+    \(inp : ParseInput) ->
+        (p inp) +~[ParseContext[A]] (\(__ : Unit) -> q inp);
+
+let (<|>)[A] (p : Parser[A]) (q : Parser[A]) : Parser[A] =
+    choice[A] p q;
+
+let sat (f : Char -> Bool) : Parser[Char] =
+    bind[Char, Char] item (\(x : Char) -> if f x then (result[Char] x) else zero[Char]);
+
+let char (x : Char) : Parser[Char] =
+    sat (\(y : Char) -> x `charEq` y);
+
+let notchar (x : Char) : Parser[Char] =
+    sat (\(y : Char) -> x != y);
+
+let digit : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isDigit(x));
+
+let upper : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isUpperCase(x));
+
+let lower : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isLowerCase(x));
+
+let space : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isSpaceChar(x));
+
+let whitespace : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isWhitespace(x));
+
+let letter : Parser[Char] =
+    choice[Char] lower upper;
+
+let alphanum : Parser[Char] =
+    choice[Char] letter digit;
+
+let noneof (s : String) : Parser[Char] =
+    sat (\(x : Char) -> (charin x (pStringFromString s)) `boolEq` False);
+
+let oneof (s : String) : Parser[Char] =
+    sat (\(x : Char) -> (charin x (pStringFromString s)));
+
+let rec stringWithPString (s : PString) : Parser[PString] =
+    case s of
+        Nil         ->  result[PString] (Nil[Char])
+     |  Cons x xs   ->
+            let xs = invoke[PString] xs;
+            (char x)
+                >>[Char, PString] (stringWithPString xs)
+                $>[PString, PString] (x +>[Char] xs);
+
+let string (s : String) : Parser[PString] =
+    stringWithPString (pStringFromString s);
+
+let eol : Parser[Unit] =
+    ((string "\r\n") $>[PString, Unit] ())
+        <|>[Unit] ((char '\r')    $>[Char, Unit] ())
+        <|>[Unit] ((char '\n')    $>[Char, Unit] ());
+
+let eof : Parser[Unit] =
+    \(inp : ParseInput) ->
+        case parseInputData inp of
+            Nil         -> singleton[ParseContext[Unit]] (newParseContext[Unit] () inp)
+         |  Cons _ _    -> (Nil[ParseContext[Unit]]);
+
+
+let rec many[A] (p : Parser[A]) : Parser[PList[A]] =
+    choice[PList[A]] (bind[A, PList[A]] p (\(x : A) ->
+                      bind[PList[A], PList[A]] (many[A] p) (\(xs : PList[A]) ->
+                      result[PList[A]] (x +>[A] xs))))
+                     (result[PList[A]] (Nil[A]));
+
+let many1[A] (p : Parser[A]) : Parser[PList[A]] =
+    bind[A, PList[A]] p (\(x : A) ->
+    bind[PList[A], PList[A]] (many[A] p) (\(xs : PList[A]) ->
+    result[PList[A]] (x +>[A] xs)));
+
+let word : Parser[PString] =
+    many1[Char] letter;
+
+let ident : Parser[PString] =
+    bind[Char, PString]    lower (\(x : Char) ->
+    bind[PString, PString] (many[Char] alphanum) (\(xs : PString) ->
+    result[PString] (x +>[Char] xs)));
+
+let natural : Parser[Int] =
+    let eval (xs : PList[Char]) =
+        foldl[Int, Int] (\(b : Int) (a : Int) -> 10 * b + a)
+                        0
+                        (map[Char, Int] (\(c : Char) -> java.lang.Character.digit(c, 10)) xs);
+
+    bind[PList[Char], Int] (many1[Char] digit) (\(xs : PList[Char]) -> result[Int] (eval xs));
+
+let hexdecimal : Parser[Int] =
+    let eval (xs : PList[Char]) =
+        foldl[Int, Int] (\(b : Int) (a : Int) -> 16 * b + a)
+                        0
+                        (map[Char, Int] (\(c : Char) -> java.lang.Character.digit(c, 16)) xs);
+    (many1[Char] (oneof "1234567890abcdefABCDEF"))
+        <$>[PList[Char], Int] (\(xs : PList[Char]) -> eval xs);
+
+let int : Parser[Int] =
+    choice[Int] ((char '-') >>[Char, Int]
+                 (using[Int,Int] natural (\(n : Int) -> (-n))))
+              natural;
+
+
+let sepby1[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    let rep[A, B] (p : Parser[A]) : Parser[A] =
+        bind[B, A] sep (\(s : B) -> bind[A, A] p (\(y : A) -> result[A] y));
+    bind[A, PList[A]]        p                       (\(x : A) ->
+    bind[PList[A], PList[A]] (many[A] (rep[A, B] p)) (\(xs : PList[A]) ->
+    result[PList[A]] (Cons[A] x (\(__ : Unit) -> xs))));
+
+let sepby2[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    let rep[A, B] (p : Parser[A]) : Parser[A] =
+        bind[B, A] sep (\(s : B) -> bind[A, A] p (\(y : A) -> result[A] y));
+    bind[A, PList[A]]        p                       (\(x : A) ->
+    bind[PList[A], PList[A]] (many1[A] (rep[A, B] p)) (\(xs : PList[A]) ->
+    result[PList[A]] (Cons[A] x (\(__ : Unit) -> xs))));
+
+let sepby[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    choice[PList[A]] (sepby1[A, B] p sep) (result[PList[A]] (Nil[A]));
+
+let between[L, R, P] (l : Parser[L]) (r : Parser[R]) (p : Parser[P]) : Parser[P] =
+    l *>[L, P] p <*[P, R] r;
+
+
+let chainl1[A] (p : Parser[A]) (op : Parser[A -> A -> A]) : Parser[A] =
+    let fy =
+        bind[A -> A -> A, (A -> A -> A, A)] op (\(f : A -> A -> A) ->
+        bind[A, (A -> A -> A, A)]           p  (\(y : A) ->
+        result[(A -> A -> A, A)] (f, y)));
+
+    bind[A, A]                           p                            (\(x : A) ->
+    bind[PList[(A -> A -> A, A)], A]     (many[(A -> A -> A, A)] fy)  (\(fys: PList[(A -> A -> A, A)]) ->
+    result[A] (foldl[(A -> A -> A, A), A] (\(x : A) (fy : (A -> A -> A, A)) -> fy._1 x fy._2) x fys)));
+
+let rec chainr1[A] (p : Parser[A]) (op : Parser[A -> A -> A]) : Parser[A] =
+    bind[A, A] p (\(x : A) ->
+        choice[A] (bind[A -> A -> A, A] op (\(f : A -> A -> A) ->
+                 bind[A, A] (chainr1[A] p op) (\(y : A) -> -- Calculate the result on the right
+                 result[A] (f x y))))
+                (result[A] x));
+
+let chainl[A] (p : Parser[A]) (op : Parser[A -> A -> A]) (v : A) : Parser[A] =
+    choice[A] (chainl1[A] p op) (result[A] v);
+
+let chainr[A] (p : Parser[A]) (op : Parser[A -> A -> A]) (v : A) : Parser[A] =
+    choice[A] (chainr1[A] p op) (result[A] v);
+
+
+let parenthesis[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '(') (char ')') p;
+
+let braces[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '{') (char '}') p;
+
+let angles[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '<') (char '>') p;
+
+let brackets[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '[') (char ']') p;
+
+
+
+let only[A] (p : Parser[A]) : Parser[A] =
+    \(inp : ParseInput) -> take[ParseContext[A]] 1 (p inp);
+
+
+let firstParseOutputEq[A] (eq : Eq[A]) (r : ParseOutput[A]) (expected : ParseContext[A]) : Bool =
+    case first[ParseContext[A]] r of
+        Nothing         -> False
+     |  Just x          -> parseContextEq[A] eq x expected;
+
+let assertFirstParseOutputEq[A] (eq : Eq[A]) (show : Show[A]) (src : ParseOutput[A]) (expected : ParseContext[A]) =
+    if firstParseOutputEq[A] eq src expected then
+        ()
+    else
+        error[Unit] "Assert failed!\n\tExpecting the 1st result: \{parseContextToString[A] show expected}"
+                    .concat("\n\tBut found output        : \{parseOutputToString[A] show src}");
+
+
+let testChar : TestFn = {
+    name = "char 'a' (pStringFromString \"abcd\")",
+    fn   = \(__ : Unit) ->
+        assertEq[ParseOutput[Char]]
+            (parseOutputEq[Char] charEq)
+            (parseOutputToString[Char] charToString)
+            (char 'a' `parsePString[Char]` (pStringFromString "abcd"))
+            (singleton[ParseContext[Char]] ('a', ((SourcePos "<default>" 1 2), (pStringFromString "bcd"))))
+};
+
+let testUpper : TestFn = {
+    name = "upper (pStringFromString \"ABC\")",
+    fn   = \(__ : Unit) ->
+        assertEq[ParseOutput[Char]]
+            (parseOutputEq[Char] charEq)
+            (parseOutputToString[Char] charToString)
+            (upper `parsePString[Char]` (pStringFromString "ABC"))
+            (singleton[ParseContext[Char]] ('A', ((SourcePos "<default>" 1 2), (pStringFromString "BC"))))
+};
+
+let testLetter : TestFn = {
+    name = "letter (pStringFromString \"abcd\")",
+    fn   = \(__ : Unit) ->
+        assertEq[ParseOutput[Char]]
+            (parseOutputEq[Char] charEq)
+            (parseOutputToString[Char] charToString)
+            (letter `parsePString[Char]` (pStringFromString "abcd"))
+            (singleton[ParseContext[Char]] ('a', ((SourcePos "<default>" 1 2), (pStringFromString "bcd"))))
+};
+
+let testString : TestFn = {
+    name = "string (pStringFromString \"abc\") (pStringFromString \"abcd\")",
+    fn   = \(__ : Unit) ->
+        assertEq[ParseOutput[PString]]
+            (parseOutputEq[PString] pStringEq)
+            (parseOutputToString[PString] pStringToString)
+            ((string "abc") `parsePString[PString]` (pStringFromString "abcd"))
+            (singleton[ParseContext[PString]] ((pStringFromString "abc"), ((SourcePos "<default>" 1 4), (pStringFromString "d"))))
+};
+
+let testMany : TestFn = {
+    name = "many (char 'a') (pStringFromString \"aaab\")",
+    fn   = \(__ : Unit) -> {
+        let expected = (pStringFromString "aaa", ((SourcePos "<default>" 1 4), pStringFromString "b"))
+            +>[ParseContext[PString]] ((pStringFromString "aa", ((SourcePos "<default>" 1 3), pStringFromString "ab"))
+            +>[ParseContext[PString]] ((pStringFromString "a", ((SourcePos "<default>" 1 2), pStringFromString "aab"))
+            +>[ParseContext[PString]] ((pStringFromString "", ((SourcePos "<default>" 1 1), pStringFromString "aaab"))
+            +>[ParseContext[PString]] (Nil[ParseContext[PString]]))));
+        assertEq[ParseOutput[PString]]
+            (parseOutputEq[PString] pStringEq)
+            (parseOutputToString[PString] pStringToString)
+            (many[Char] (char 'a') `parsePString[PString]` (pStringFromString "aaab"))
+            expected
+    }
+};
+
+let testMany1 : TestFn = {
+    name = "many1 (char 'a') (pStringFromString \"aaab\")",
+    fn   = \(__ : Unit) -> {
+        let expected = (pStringFromString "aaa", ((SourcePos "<default>" 1 4), pStringFromString "b"))
+            +>[ParseContext[PString]] ((pStringFromString "aa", ((SourcePos "<default>" 1 3), pStringFromString "ab"))
+            +>[ParseContext[PString]] ((pStringFromString "a", ((SourcePos "<default>" 1 2), pStringFromString "aab"))
+            +>[ParseContext[PString]] (Nil[ParseContext[PString]])));
+        assertEq[ParseOutput[PString]]
+            (parseOutputEq[PString] pStringEq)
+            (parseOutputToString[PString] pStringToString)
+            (many1[Char] (char 'a') `parsePString[PString]` (pStringFromString "aaab"))
+            expected
+    }
+};
+
+let testChoice : TestFn = {
+    name = "choice (char 'a') (char 'b') (pStringFromString \"aaab\")",
+    fn   = \(__ : Unit) ->
+        assertEq[ParseOutput[Char]]
+            (parseOutputEq[Char] charEq)
+            (parseOutputToString[Char] charToString)
+            (choice[Char] (char 'a') (char 'b') `parsePString[Char]` (pStringFromString "aaab"))
+            (singleton[ParseContext[Char]] ('a', ((SourcePos "<default>" 1 2), pStringFromString "aab")))
+};
+
+let testChoice2 : TestFn = {
+    name = "choice (string \"aa\") (string \"aaa\") (pStringFromString \"aaab\")",
+    fn   = \(__ : Unit) -> {
+        let expected = (pStringFromString "aa", ((SourcePos "<default>" 1 3), pStringFromString "ab"))
+            +>[ParseContext[PString]] ((pStringFromString "aaa", ((SourcePos "<default>" 1 4), pStringFromString "b"))
+            +>[ParseContext[PString]] (Nil[ParseContext[PString]]));
+
+        assertEq[ParseOutput[PString]]
+            (parseOutputEq[PString] pStringEq)
+            (parseOutputToString[PString] pStringToString)
+            (choice[PString] (string "aa") (string "aaa")
+                `parsePString[PString]` (pStringFromString "aaab"))
+            expected
+    }
+};
+
+let testWord : TestFn = {
+    name = "word (pStringFromString \"aaabcd abcd\")",
+    fn   = \(__ : Unit) -> {
+        let expected = (pStringFromString "aaabcd", ((SourcePos "<default>" 1 7), pStringFromString " abcd"))
+            +>[ParseContext[PString]] ((pStringFromString "aaabc", ((SourcePos "<default>" 1 6), pStringFromString "d abcd"))
+            +>[ParseContext[PString]] ((pStringFromString "aaab", ((SourcePos "<default>" 1 5), pStringFromString "cd abcd"))
+            +>[ParseContext[PString]] ((pStringFromString "aaa", ((SourcePos "<default>" 1 4), pStringFromString "bcd abcd"))
+            +>[ParseContext[PString]] ((pStringFromString "aa", ((SourcePos "<default>" 1 3), pStringFromString "abcd abcd"))
+            +>[ParseContext[PString]] ((pStringFromString "a", ((SourcePos "<default>" 1 2), pStringFromString "aabcd abcd"))
+            +>[ParseContext[PString]] (Nil[ParseContext[PString]]))))));
+        assertEq[ParseOutput[PString]]
+            (parseOutputEq[PString] pStringEq)
+            (parseOutputToString[PString] pStringToString)
+            (word `parsePString[PString]` (pStringFromString "aaabcd abcd"))
+            expected
+    }
+};
+
+let testNatural : TestFn = {
+    name = "natural (pStringFromString \"12345\")",
+    fn   = \(__ : Unit) -> {
+        let expected = (12345, ((SourcePos "<default>" 1 6), pStringFromString ""))
+            +>[ParseContext[Int]] ((1234, ((SourcePos "<default>" 1 5), pStringFromString "5"))
+            +>[ParseContext[Int]] ((123, ((SourcePos "<default>" 1 4), pStringFromString "45"))
+            +>[ParseContext[Int]] ((12, ((SourcePos "<default>" 1 3), pStringFromString "345"))
+            +>[ParseContext[Int]] ((1, ((SourcePos "<default>" 1 2), pStringFromString "2345"))
+            +>[ParseContext[Int]] (Nil[ParseContext[Int]])))));
+
+        assertEq[ParseOutput[Int]]
+            (parseOutputEq[Int] intEq)
+            (parseOutputToString[Int] intToString)
+            (natural `parsePString[Int]` (pStringFromString "12345"))
+            expected
+    }
+};
+
+let testHexDecimal : TestFn = {
+    name = "hexdecimal (pStringFromString \"a0\")",
+    fn   = \(__ : Unit) ->
+         assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (hexdecimal `parsePString[Int]` (pStringFromString "a0"))
+            (160, ((SourcePos "<default>" 1 3), pStringFromString ""))
+};
+
+let testSepby1 : TestFn = {
+    name = "sepby1[PString, Char] word (char ',') (pStringFromString \"abc,def\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[PList[PString]]
+            (pListEq[PString] pStringEq)
+            (pListToString[PString] pStringToString)
+            (sepby1[PString, Char] (word) (char ',') `parsePString[PList[PString]]` (pStringFromString "abc,def"))
+            ((pStringFromString "abc") +>[PString] ((pStringFromString "def") +>[PString] (Nil[PString])),
+             ((SourcePos "<default>" 1 8), (pStringFromString "")))
+};
+
+let testNoneOf : TestFn = {
+    name = "noneof (pStringFromString \"abc\") (pStringFromString \"dce\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Char]
+                charEq
+                charToString
+                (noneof "abc" `parsePString[Char]` (pStringFromString "dce"))
+                ('d', ((SourcePos "<default>" 1 2), pStringFromString "ce"))
+};
+
+let testCombinatorsSuite : TestSuite = {
+    name = "Test Combinators",
+    fns  = testChar
+                +>[TestFn] (testUpper
+                +>[TestFn] (testLetter
+                +>[TestFn] (testString
+                +>[TestFn] (testMany
+                +>[TestFn] (testMany1
+                +>[TestFn] (testChoice
+                +>[TestFn] (testChoice2
+                +>[TestFn] (testWord
+                +>[TestFn] (testNatural
+                +>[TestFn] (testHexDecimal
+                +>[TestFn] (testSepby1
+                +>[TestFn] (Nil[TestFn]))))))))))))
+};
+
+
+let bracket[B] (p : Parser[B]) : Parser[B] =
+    between[Char, Char, B] (char '(') (char ')') p;
+
+let operation =
+    let addop (a : Int) (b : Int) : Int = a + b;
+    let subop (a : Int) (b : Int) : Int = a - b;
+    let mulop (a : Int) (b : Int) : Int = a * b;
+    let divop (a : Int) (b : Int) : Int = a / b;
+
+    let add = (char '+') $>[Char, Int -> Int -> Int] addop;
+    let sub = (char '-') $>[Char, Int -> Int -> Int] subop;
+    let mul = (char '*') $>[Char, Int -> Int -> Int] mulop;
+    let div = (char '/') $>[Char, Int -> Int -> Int] divop;
+
+    add `choice[Int -> Int -> Int]` sub `choice[Int -> Int -> Int]` mul `choice[Int -> Int -> Int]` div;
+
+let rec expr : Parser[Int] =
+    \(s : ParseInput) -> chainl1[Int] factor operation s
+and factor : Parser[Int] =
+    \(s : ParseInput) -> choice[Int] natural (bracket[Int] expr) s;
+
+
+let testSimpleExpr : TestFn = {
+    name = "expr (pStringFromString \"123\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "123"))
+            (123, ((SourcePos "<default>" 1 4), pStringFromString ""))
+};
+
+let testSimpleExprWithBracket : TestFn = {
+    name = "expr (pStringFromString \"(123)\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "(123)"))
+            (123, ((SourcePos "<default>" 1 6), pStringFromString ""))
+};
+
+let testSimpleExpr2 : TestFn = {
+    name = "expr (pStringFromString \"1+2\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "1+2"))
+            (3, ((SourcePos "<default>" 1 4), pStringFromString ""))
+};
+
+let testSimpleExpr3 : TestFn = {
+    name = "expr (pStringFromString \"10+2\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "10+2"))
+            (12, ((SourcePos "<default>" 1 5), pStringFromString ""))
+};
+
+let testSimpleExpr4 : TestFn = {
+    name = "expr (pStringFromString \"(10+2)*2\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "(10+2)*2"))
+            (24, ((SourcePos "<default>" 1 9), pStringFromString ""))
+};
+
+let testSimpleExpr5 : TestFn = {
+    name = "expr (pStringFromString \"(10+2)*2/6\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[Int]
+            intEq
+            intToString
+            (expr `parsePString[Int]` (pStringFromString "(10+2)*2/6"))
+            (4, ((SourcePos "<default>" 1 11), pStringFromString ""))
+};
+
+let testSimpleArithmetricExprSuite : TestSuite = {
+    name = "Test Simple Arithmetic Suite",
+    fns  = testSimpleExpr
+                +>[TestFn] (testSimpleExprWithBracket
+                +>[TestFn] (testSimpleExpr2
+                +>[TestFn] (testSimpleExpr3
+                +>[TestFn] (testSimpleExpr4
+                +>[TestFn] (testSimpleExpr5
+                +>[TestFn] (Nil[TestFn]))))))
+};
+
+
+
+data XMLNode = XMLText      String
+             | XMLAttr      String String
+             | XMLElement   String PList[XMLNode] PList[XMLNode]
+             | XMLCData     String
+             | XMLComment   String
+             | XMLProcInst  String PList[XMLNode]
+             ;
+
+let rec xmlNodeEqual (a : XMLNode) (b : XMLNode) : Bool =
+    case a of
+        XMLText stra            -> {
+            case b of
+                XMLText strb                    -> stringEq stra strb
+             |  XMLComment str                  -> False
+             |  XMLAttr key val                 -> False
+             |  XMLCData cdata                  -> False
+             |  XMLProcInst t attrs             -> False
+             |  XMLElement tag attrs children   -> False
+        }
+     |  XMLComment stra         -> {
+            case b of
+                XMLText strb                    -> False
+             |  XMLComment strb                 -> stringEq stra strb
+             |  XMLAttr key val                 -> False
+             |  XMLCData cdata                  -> False
+             |  XMLProcInst t attrs             -> False
+             |  XMLElement tag attrs children   -> False
+        }
+     |  XMLAttr keya vala       -> {
+            case b of
+                XMLText strb                    -> False
+             |  XMLComment strb                 -> False
+             |  XMLAttr keyb valb               -> (stringEq keya keyb) && (stringEq vala valb)
+             |  XMLCData cdata                  -> False
+             |  XMLProcInst t attrs             -> False
+             |  XMLElement tag attrs children   -> False
+        }
+     |  XMLCData cdataa         -> {
+            case b of
+                XMLText strb                    -> False
+             |  XMLComment strb                 -> False
+             |  XMLAttr key val                 -> False
+             |  XMLCData cdatab                 -> stringEq cdataa cdatab
+             |  XMLProcInst t attrs             -> False
+             |  XMLElement tag attrs children   -> False
+        }
+     |  XMLProcInst ta attrsa   -> {
+            case b of
+                XMLText strb                    -> False
+             |  XMLComment strb                 -> False
+             |  XMLAttr key val                 -> False
+             |  XMLCData cdatab                 -> False
+             |  XMLProcInst tb attrsb           ->
+                    ((stringEq ta tb) && (pListEq[XMLNode] xmlNodeEqual attrsa attrsb))
+             |  XMLElement tag attrs children   -> False
+        }
+     |  XMLElement taga attrsa childrena    -> {
+            case b of
+                XMLText strb                        -> False
+             |  XMLComment str                      -> False
+             |  XMLAttr key val                     -> False
+             |  XMLCData cdata                      -> False
+             |  XMLProcInst t attrs                 -> False
+             |  XMLElement tagb attrsb childrenb    ->
+                    (stringEq taga tagb)
+                        && (pListEq[XMLNode] xmlNodeEqual attrsa attrsb)
+                        && (pListEq[XMLNode] xmlNodeEqual childrena childrenb)
+        };
+
+let rec xmlNodeToString (xml : XMLNode) : String =
+    case xml of
+        XMLText str         -> "XMLText \{str}"
+     |  XMLComment str      -> "XMLComment \{str}"
+     |  XMLAttr key val     -> "XMLAttr \{key} \{val}"
+     |  XMLCData cdata      -> "XMLCData \{cdata}"
+     |  XMLProcInst t attrs
+            -> "XMLProcInst \{t} \{pListToString[XMLNode] xmlNodeToString attrs}"
+     |  XMLElement tag attrs children
+            -> "XMLElement \{tag} \{pListToString[XMLNode] xmlNodeToString attrs} \{pListToString[XMLNode] xmlNodeToString children}";
+
+
+let xmlComment : Parser[XMLNode] =
+    (string "<!--")
+        *>[PString, PList[Char]] (many[Char] item)
+        <*[PList[Char], PString] (string "-->")
+        <$>[PList[Char], XMLNode] (\(cmt : PList[Char]) -> XMLComment (pStringToString cmt));
+
+let xmlSpace : Parser[Unit] =
+    only[Unit]
+        (choice[Unit]
+            (bind[PList[Char], Unit] (many[Char] whitespace) (\(__ : PList[Char]) -> result[Unit] ()))
+            (bind[PList[Char], Unit] (many[Char] whitespace) (\(sp1 : PList[Char]) ->
+             bind[XMLNode, Unit]     xmlComment              (\(cmt : XMLNode) ->
+             bind[PList[Char], Unit] (many[Char] whitespace) (\(sp2 : PList[Char]) ->
+             result[Unit] ())))));
+
+let xmlEscapedChar : Parser[Char] =
+    let quot = (string "&quot;") $>[PString, Char] '"';
+    let apos = (string "&apos;") $>[PString, Char] '\'';
+    let lt = (string "&lt;")     $>[PString, Char] '<';
+    let gt = (string "&gt;")     $>[PString, Char] '>';
+    let amp = (string "&amp;")   $>[PString, Char] '&';
+
+    quot `choice[Char]` apos `choice[Char]` lt `choice[Char]` gt `choice[Char]` amp;
+
+let xmlEscapedCodePoint : Parser[PString] =
+    (string "&#x")
+        *>[PString, Int] hexdecimal
+        <*[Int, Char] (char ';')
+        <$>[Int, PString] (\(codep : Int) ->
+                (pStringFromString (new java.lang.String(java.lang.Character.toChars(codep)))));
+
+let xmlChar : Parser[Char] =
+    xmlEscapedChar <|>[Char] (noneof "\"'<>&");
+
+let xmlString : Parser[PString] =
+    many1[Char] xmlChar
+       <|>[PString] xmlEscapedCodePoint;
+
+let xmlDoubleQuotedString : Parser[PString] =
+    (char '"') *>[Char, PString] xmlString <*[PString, Char] (char '"');
+
+let xmlSingleQuotedString : Parser[PString] =
+    (char '\'') *>[Char, PString] xmlString <*[PString, Char] (char '\'');
+
+let xmlQuotedString : Parser[PString] =
+    choice[PString] xmlDoubleQuotedString xmlSingleQuotedString;
+
+let xmlText : Parser[XMLNode] =
+    xmlString <$>[PString, XMLNode] (\(content : PString) -> XMLText (pStringToString content));
+
+let xmlCData : Parser[XMLNode] =
+    string "<![CDATA["
+        *>[PString, PList[Char]] (many[Char] item)
+            <$>[PList[Char], XMLNode] (\(cd : PList[Char]) -> XMLCData (pStringToString cd))
+        <*[XMLNode, PString] (string "]]>");
+
+let xmlKey : Parser[PString] =
+    many1[Char] (letter <|>[Char] (char '-'));
+
+let xmlAttr : Parser[XMLNode] =
+    bind[PString, XMLNode]  xmlKey                                                          (\(key : PString) ->
+    bind[PString, XMLNode]  (xmlSpace >>[Unit, Char] (char '=')
+                                         >>[Char, Unit] xmlSpace
+                                         >>[Unit, PString] xmlQuotedString)                 (\(val : PString) ->
+    result[XMLNode] (XMLAttr (pStringToString key) (pStringToString val))));
+
+let xmlAttrs : Parser[PList[XMLNode]] =
+    sepby[XMLNode, Unit] xmlAttr xmlSpace;
+
+let xmlEndTag (tag : PString) : Parser[Unit] =
+    (string "</")
+        >>[PString, Unit]   xmlSpace
+        >>[Unit, PString]   (stringWithPString tag)
+        >>[PString, Unit]   xmlSpace
+        >>[Unit, Char]      (char '>')
+        $>[Char, Unit]      ();
+
+let rec xmlElement : Parser[XMLNode] =
+    (char '<') >>[Char, Unit] xmlSpace >>[Unit, PString] xmlKey >>=[PString, XMLNode] (\(tag : PString) ->
+        xmlSpace >>[Unit, PList[XMLNode]] xmlAttrs >>=[PList[XMLNode], XMLNode] (\(attrs : PList[XMLNode]) ->
+            ((char '>') >>[Char, Unit] xmlSpace >>[Unit, PList[XMLNode]]
+                xmlElementChildren <*[PList[XMLNode], Unit] xmlSpace <*[PList[XMLNode], Unit] (xmlEndTag tag)
+                    <$>[PList[XMLNode], XMLNode] (\(ch : PList[XMLNode]) -> XMLElement (pStringToString tag) attrs ch))
+
+            <|>[XMLNode]
+
+            ((string "/>")
+                >>[PString, XMLNode] (result[XMLNode] (XMLElement (pStringToString tag) attrs (Nil[XMLNode]))))))
+
+and xmlElementChildren : Parser[PList[XMLNode]] =
+    (xmlCData <$>[XMLNode, PList[XMLNode]] (\(c : XMLNode) -> singleton[XMLNode] c)
+        <|>[PList[XMLNode]] (xmlText `using[XMLNode, PList[XMLNode]]` (\(n : XMLNode) -> singleton[XMLNode] n))
+        <|>[PList[XMLNode]] (sepby1[XMLNode, Unit] xmlElement xmlSpace))
+    <|>[PList[XMLNode]] (result[PList[XMLNode]] (Nil[XMLNode]));
+
+let xmlProcInst : Parser[XMLNode] =
+    (string "<?") >>[PString, Unit] xmlSpace
+        >>[Unit, PString] xmlKey >>=[PString, XMLNode] (\(target : PString) ->
+            xmlSpace >>[Unit, PList[XMLNode]] xmlAttrs
+                <*[PList[XMLNode], PString] (xmlSpace >>[Unit, PString] (string "?>"))
+                    >>=[PList[XMLNode], XMLNode] (\(conts : PList[XMLNode]) ->
+                        result[XMLNode] (XMLProcInst (pStringToString target) conts)));
+
+let parseXML : Parser[PList[XMLNode]] =
+    (many[XMLNode] xmlProcInst)
+        >>=[PList[XMLNode], PList[XMLNode]] (\(procinst1 : PList[XMLNode]) ->
+            xmlElement >>=[XMLNode, PList[XMLNode]] (\(root : XMLNode) ->
+                (many[XMLNode] xmlProcInst) >>=[PList[XMLNode], PList[XMLNode]] (\(procinst2 : PList[XMLNode]) ->
+                    result[PList[XMLNode]] (procinst1 ++[XMLNode] (root +>[XMLNode] procinst2)))));
+
+
+let printFirstXMLResult (r : PList[(XMLNode, PString)]) =
+    case first[(XMLNode, PString)] r of
+        Nothing        -> print "Nothing in the List!!"
+     |  Just x         ->
+            print "(\{xmlNodeToString x._1}, \"\{pStringToString x._2}\")";
+
+let testXMLComment : TestFn = {
+    name = "xmlComment (pStringFromString \"<!-- hahaa? -->\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlComment `parsePString[XMLNode]` (pStringFromString "<!-- hahaa? -->"))
+            ((XMLComment " hahaa? "),
+             ((SourcePos "<default>" 1 16), pStringFromString ""))
+};
+
+let testXMLDoubleQuotedString : TestFn = {
+    name = "xmlDoubleQuotedString (pStringFromString \"\\\"abcdef\\\"\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[PString]
+            pStringEq
+            pStringToString
+            (xmlDoubleQuotedString `parsePString[PString]` (pStringFromString "\"abcdef\""))
+            (pStringFromString "abcdef", ((SourcePos "<default>" 1 9), pStringFromString ""))
+};
+
+let testXMLSingleQuotedString : TestFn = {
+    name = "xmlSingleQuotedString (pStringFromString \"'abcdef'\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[PString]
+            pStringEq
+            pStringToString
+            (xmlSingleQuotedString `parsePString[PString]` (pStringFromString "'abcdef'"))
+            ((pStringFromString "abcdef"), ((SourcePos "<default>" 1 9), (pStringFromString "")))
+};
+
+let testXMLText : TestFn = {
+    name = "xmlText (pStringFromString \"abcdefg&lt;hijk\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlText `parsePString[XMLNode]` (pStringFromString "abcdefg&lt;hijk"))
+            (XMLText "abcdefg<hijk", ((SourcePos "<default>" 1 16), pStringFromString ""))
+};
+
+let testXMLTextEmpty : TestFn = {
+    name = "xmlText (pStringFromString \"\")",
+    fn   = \(__ : Unit) ->
+        assert (isempty[ParseContext[XMLNode]] (xmlText `parsePString[XMLNode]` (pStringFromString "")))
+};
+
+let testXMLAttr : TestFn = {
+    name = "xmlAttr (pStringFromString \"key = \\\"vvvalue\\\"\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlAttr `parsePString[XMLNode]` (pStringFromString "key = \"vvvalue\""))
+            (XMLAttr "key" "vvvalue",
+             ((SourcePos "<default>" 1 16), pStringFromString ""))
+};
+
+let testXMLAttrs : TestFn = {
+    name = "xmlAttrs (pStringFromString \"key = \\\"vvvalue\\\" hello = \\\"world\\\" haha='what?'\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[PList[XMLNode]]
+            (pListEq[XMLNode] xmlNodeEqual)
+            (pListToString[XMLNode] xmlNodeToString)
+            (xmlAttrs `parsePString[PList[XMLNode]]` (pStringFromString "key = \"vvvalue\" hello = \"world\" haha='what?'"))
+            ((XMLAttr "key""vvvalue")
+                +>[XMLNode] ((XMLAttr "hello" "world")
+                +>[XMLNode] ((XMLAttr "haha" "what?")
+                +>[XMLNode] (Nil[XMLNode]))),
+             ((SourcePos "<default>" 1 45), pStringFromString ""))
+};
+
+let testElementSimple : TestFn = {
+    name = "xmlElement (pStringFromString \"<a></a>\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a></a>"))
+            (XMLElement "a" (Nil[XMLNode]) (Nil[XMLNode]),
+             ((SourcePos "<default>" 1 8), pStringFromString ""))
+};
+
+let testElementWithText : TestFn = {
+    name = "xmlElement (pStringFromString \"<a>ha?haha!</a>\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a>ha?haha!</a>"))
+            (XMLElement "a" (Nil[XMLNode]) (singleton[XMLNode] (XMLText "ha?haha!")),
+             ((SourcePos "<default>" 1 16), pStringFromString ""))
+};
+
+let testElementWithChildren : TestFn = {
+    name = "xmlElement (pStringFromString \"<a><b></b></a>\")",
+    fn   = \(__ : Unit) ->
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a><b></b></a>"))
+            (XMLElement "a" (Nil[XMLNode])
+                (singleton[XMLNode] (XMLElement "b" (Nil[XMLNode]) (Nil[XMLNode]))),
+             ((SourcePos "<default>" 1 15), pStringFromString ""))
+};
+
+let testElementWithChildren2 : TestFn = {
+    name = "xmlElement (pStringFromString \"<a><b></b><c></c></a>\")",
+    fn   = \(__ : Unit) -> {
+        let b = XMLElement "b" (Nil[XMLNode]) (Nil[XMLNode]);
+        let c = XMLElement "c" (Nil[XMLNode]) (Nil[XMLNode]);
+        let a = XMLElement "a" (Nil[XMLNode]) (b +>[XMLNode] (c +>[XMLNode] (Nil[XMLNode])));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a><b></b><c></c></a>"))
+            (a, ((SourcePos "<default>" 1 22), pStringFromString ""))
+    }
+};
+
+let testElementWithAttr : TestFn = {
+    name = "xmlElement (pStringFromString \"<a href='/toosimple/sometimes/naive'>ha?haha!</a>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "a"
+                        (singleton[XMLNode] (XMLAttr "href" "/toosimple/sometimes/naive"))
+                        (singleton[XMLNode] (XMLText "ha?haha!"));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a href='/toosimple/sometimes/naive'>ha?haha!</a>"))
+            (elem, ((SourcePos "<default>" 1 50), pStringFromString ""))
+    }
+};
+
+let testElementWithAttrWithChildren : TestFn = {
+    name = "xmlElement (pStringFromString \"<a href='/toosimple/sometimes/naive'><b></b></a>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "a"
+                        (singleton[XMLNode] (XMLAttr "href" "/toosimple/sometimes/naive"))
+                        (singleton[XMLNode] (XMLElement "b" (Nil[XMLNode]) (Nil[XMLNode])));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a href='/toosimple/sometimes/naive'><b></b></a>"))
+            (elem, ((SourcePos "<default>" 1 49), pStringFromString ""))
+    }
+};
+
+let testElementSimple2 : TestFn = {
+    name = "xmlElement (pStringFromString \"<you young='too' simple='too'><naive>true</naive></you>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "you"
+                        ((XMLAttr "young" "too")
+                            +>[XMLNode] ((XMLAttr "simple"  "too")
+                            +>[XMLNode] (Nil[XMLNode])))
+                        (singleton[XMLNode] (XMLElement "naive" (Nil[XMLNode])
+                            (singleton[XMLNode] (XMLText "true"))));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]`
+                (pStringFromString
+                    "<you young='too' simple='too'><naive>true</naive></you>"))
+            (elem, ((SourcePos "<default>" 1 56), pStringFromString ""))
+    }
+};
+
+let testElementSimpleEndTag : TestFn = {
+    name = "xmlElement (pStringFromString \"<a/>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement "a" (Nil[XMLNode]) (Nil[XMLNode]);
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a/>"))
+            (elem, ((SourcePos "<default>" 1 5), pStringFromString ""))
+    }
+};
+
+let testElementSimpleEndTag2 : TestFn = {
+    name = "xmlElement (pStringFromString \"<you young='too' simple='too'><naive><required/></naive></you>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "you"
+                        ((XMLAttr "young" "too")
+                            +>[XMLNode] ((XMLAttr "simple" "too")
+                            +>[XMLNode] (Nil[XMLNode])))
+                        (singleton[XMLNode] (XMLElement "naive" (Nil[XMLNode])
+                            (singleton[XMLNode] (XMLElement "required" (Nil[XMLNode]) (Nil[XMLNode])))));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]`
+                (pStringFromString
+                    "<you young='too' simple='too'><naive><required/></naive></you>"))
+            (elem, ((SourcePos "<default>" 1 63), pStringFromString ""))
+    }
+};
+
+let testElementSimpleEndTag3 : TestFn = {
+    name = "xmlElement (pStringFromString \"<you young='too' simple='too'>\\n\\t<naive>\\n\\t\\t<required/>\\n\\t</naive>\\n</you>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "you"
+                        ((XMLAttr "young" "too")
+                            +>[XMLNode] ((XMLAttr "simple" "too")
+                            +>[XMLNode] (Nil[XMLNode])))
+                        (singleton[XMLNode] (XMLElement "naive" (Nil[XMLNode])
+                            (singleton[XMLNode] (XMLElement "required" (Nil[XMLNode]) (Nil[XMLNode])))));
+
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]`
+                (pStringFromString
+                    "<you young='too' simple='too'>\n\t<naive>\n\t\t<required/>\n\t</naive>\n</you>"))
+            (elem, ((SourcePos "<default>" 5 7), pStringFromString ""))
+    }
+};
+
+let testElementSimpleEndTag4 : TestFn = {
+    name = "xmlElement (pStringFromString \"<a href='https://github.com/hkuplg/fcore'/>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement
+                        "a"
+                        (singleton[XMLNode] (XMLAttr "href"
+                                                     "https://github.com/hkuplg/fcore"))
+                        (Nil[XMLNode]);
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<a href='https://github.com/hkuplg/fcore'/>"))
+            (elem, ((SourcePos "<default>" 1 44), pStringFromString ""))
+    }
+};
+
+let testCDataSimple : TestFn = {
+    name = "xmlCData (pStringFromString \"<![CDATA[function matchwo(a,b) { if (a < b && a < 0) then }]]>\"",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLCData "function matchwo(a,b) { if (a < b && a < 0) then }";
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlCData `parsePString[XMLNode]` (pStringFromString "<![CDATA[function matchwo(a,b) { if (a < b && a < 0) then }]]>"))
+            (elem, ((SourcePos "<default>" 1 63), pStringFromString ""))
+    }
+};
+
+let testElementWithCData : TestFn = {
+    name = "xmlElement (pStringFromString \"<script><![CDATA[function matchwo(a,b) { &&<>!!!?; }]]></script>\"",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLElement "script" (Nil[XMLNode])
+                        (singleton[XMLNode] (XMLCData "function matchwo(a,b) { &&<>!!!?; }"));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlElement `parsePString[XMLNode]` (pStringFromString "<script><![CDATA[function matchwo(a,b) { &&<>!!!?; }]]></script>"))
+            (elem, ((SourcePos "<default>" 1 65), pStringFromString ""))
+    }
+};
+
+let testProcInst : TestFn = {
+    name = "xmlProcInst (pStringFromString \"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\" ?>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLProcInst "xml"
+                        ((XMLAttr "version" "1.0")
+                            +>[XMLNode] ((XMLAttr "encoding" "UTF-8")
+                            +>[XMLNode] (Nil[XMLNode])));
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlProcInst `parsePString[XMLNode]` (pStringFromString "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"))
+            (elem, ((SourcePos "<default>" 1 40), pStringFromString ""))
+    }
+};
+
+let testProcInst2 : TestFn = {
+    name = "xmlProcInst (pStringFromString \"<?xml-stylesheet ?>\")",
+    fn   = \(__ : Unit) -> {
+        let elem = XMLProcInst "xml-stylesheet" (Nil[XMLNode]);
+        assertFirstParseOutputEq[XMLNode]
+            xmlNodeEqual
+            xmlNodeToString
+            (xmlProcInst `parsePString[XMLNode]` (pStringFromString "<?xml-stylesheet ?>"))
+            (elem, ((SourcePos "<default>" 1 20), pStringFromString ""))
+    }
+};
+
+let testNaiveXMLParserSuite : TestSuite = {
+    name = "Test Naive XML Parser",
+    fns  = testXMLComment
+                +>[TestFn] (testXMLDoubleQuotedString
+                +>[TestFn] (testXMLSingleQuotedString
+                +>[TestFn] (testXMLText
+                +>[TestFn] (testXMLTextEmpty
+                +>[TestFn] (testXMLAttr
+                +>[TestFn] (testXMLAttrs
+                +>[TestFn] (testElementSimple
+                +>[TestFn] (testElementWithText
+                +>[TestFn] (testElementWithChildren
+                +>[TestFn] (testElementWithChildren2
+                +>[TestFn] (testElementWithAttr
+                +>[TestFn] (testElementWithAttrWithChildren
+                +>[TestFn] (testElementSimple2
+                +>[TestFn] (testElementSimpleEndTag
+                +>[TestFn] (testElementSimpleEndTag2
+                +>[TestFn] (testElementSimpleEndTag3
+                +>[TestFn] (testElementSimpleEndTag4
+                +>[TestFn] (testCDataSimple
+                +>[TestFn] (testElementWithCData
+                +>[TestFn] (testProcInst
+                +>[TestFn] (testProcInst2
+                +>[TestFn] (Nil[TestFn]))))))))))))))))))))))
+};
+
+
+data F2JType = F2JNormalType    String PList[F2JType]
+             | F2JPairedType    PList[F2JType]
+             | F2JFunctionType  F2JType F2JType
+             ;
+
+let rec f2jTypeToString (t : F2JType) : String =
+    case t of
+        F2JNormalType name params ->
+            "F2JNormalType \{name} \{pListToString[F2JType] f2jTypeToString params}"
+     |  F2JPairedType types ->
+            "F2JPairedType \{pListToString[F2JType] f2jTypeToString types}"
+     |  F2JFunctionType from to ->
+            "F2JFunctionType (\{f2jTypeToString from} -> \{f2jTypeToString to})";
+
+let rec f2jTypeEq (a : F2JType) (b : F2JType) : Bool =
+    case a of
+        F2JNormalType n1 p1 -> {
+            case b of
+                F2JNormalType n2 p2 -> (n1 `stringEq` n2) && (pListEq[F2JType] f2jTypeEq p1 p2)
+             |  F2JPairedType _     -> False
+             |  F2JFunctionType _ _ -> False
+        }
+     |  F2JPairedType t1 -> {
+            case b of
+                F2JNormalType _ _   -> False
+             |  F2JPairedType t2    -> pListEq[F2JType] f2jTypeEq t1 t2
+             |  F2JFunctionType _ _ -> False
+        }
+     |  F2JFunctionType t1f t1t -> {
+            case b of
+                F2JNormalType _ _       -> False
+             |  F2JPairedType _         -> False
+             |  F2JFunctionType t2f t2t -> (t1f `f2jTypeEq` t2f) && (t1t `f2jTypeEq` t2t)
+        };
+
+data F2JBindingParam = F2JBindingParam String F2JType;
+
+let f2jBindingParamToString (b : F2JBindingParam) : String =
+    case b of
+        F2JBindingParam id t ->
+            "F2JBindingParam \{id} \{f2jTypeToString t}";
+
+let f2jBindingParamEq (a : F2JBindingParam) (b : F2JBindingParam) : Bool =
+    case a of
+        F2JBindingParam ida ta ->
+            case b of
+                F2JBindingParam idb tb ->
+                    (ida `stringEq` idb) && (ta `f2jTypeEq` tb);
+
+data F2JADTAlternative = F2JADTAlternative String PList[F2JType];
+
+let f2jADTAlternativeToString (a : F2JADTAlternative) : String =
+    case a of
+        F2JADTAlternative name args ->
+            "F2JADTAlternative \{name} \{pListToString[F2JType] f2jTypeToString args}";
+
+data F2JADTRecordItem = F2JADTRecordItem String F2JType;
+
+let f2jADTRecordItemToString (a : F2JADTRecordItem) : String =
+    case a of
+        F2JADTRecordItem id t ->
+            "F2JADTRecordItem \{id} \{f2jTypeToString t}";
+
+data F2JADTBody = F2JADTNormalBody F2JType PList[F2JADTAlternative]
+                | F2JADTRecordBody F2JType PList[F2JADTRecordItem]
+                ;
+
+let f2jADTBodyToString (a : F2JADTBody) : String =
+    case a of
+        F2JADTNormalBody t alts ->
+            "F2JADTNormalBody \{f2jTypeToString t} \{pListToString[F2JADTAlternative] f2jADTAlternativeToString alts}"
+     |  F2JADTRecordBody t items ->
+            "F2JADTRecordBody \{f2jTypeToString t} \{pListToString[F2JADTRecordItem] f2jADTRecordItemToString items}"
+     ;
+
+data rec
+    F2JBindingBody = F2JLetBindingBody     String PList[F2JType] PList[F2JBindingParam] Maybe[F2JType] F2JExpr
+                   | F2JLetRecBindingBody  String PList[F2JType] PList[F2JBindingParam] F2JType        F2JExpr
+
+and F2JApplicationParam = F2JApplicationParamExpr F2JExpr
+                        | F2JApplicationParamType PList[F2JType]
+
+and F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
+
+and F2JRecordItem = F2JRecordItem String F2JExpr
+
+and F2JExpr = F2JApplication        F2JExpr                  F2JApplicationParam
+            | F2JLet                PList[F2JBindingBody]    F2JExpr
+            | F2JLetRec             PList[F2JBindingBody]    F2JExpr
+            | F2JLambda             PList[F2JBindingParam]   F2JExpr
+            | F2JCase               F2JExpr                  PList[F2JCaseAlternative]
+            | F2JADT                PList[F2JADTBody]        F2JExpr
+            | F2JRecADT             PList[F2JADTBody]        F2JExpr
+            | F2JTypeAlias          F2JType                  F2JType                     F2JExpr
+            | F2JPair               PList[F2JExpr]
+            | F2JIntLiteral         String
+            | F2JStringLiteral      String
+            | F2JVariable           String
+            | F2JBlock              PList[F2JExpr]
+            | F2JRecord             PList[F2JRecordItem]
+            ;
+
+let rec f2jBindingBodyToString (b : F2JBindingBody) : String =
+    case b of
+        F2JLetBindingBody name args params rettype expr ->
+            "F2JLetBindingBody \{name} \{pListToString[F2JType] f2jTypeToString args} \{pListToString[F2JBindingParam] f2jBindingParamToString params} \{maybeToString[F2JType] f2jTypeToString rettype} \{f2jExprToString expr}"
+     |  F2JLetRecBindingBody name args params rettype expr ->
+            "F2JLetRecBindingBody \{name} \{pListToString[F2JType] f2jTypeToString args} \{pListToString[F2JBindingParam] f2jBindingParamToString params} \{f2jTypeToString rettype} \{f2jExprToString expr}"
+
+and f2jApplicationParamToString (p : F2JApplicationParam) : String =
+    case p of
+        F2JApplicationParamExpr expr ->
+            "F2JApplicationParamExpr \{f2jExprToString expr}"
+     |  F2JApplicationParamType t ->
+            "F2JApplicationParamType \{pListToString[F2JType] f2jTypeToString t}"
+
+and f2jCaseAlternativeToString (c : F2JCaseAlternative) : String =
+    case c of
+        F2JCaseAlternative name args expr ->
+            "F2JCaseAlternative \{name} \{pListToString[String] stringToString args} -> \{f2jExprToString expr}"
+
+and f2jRecordItemToString (c : F2JRecordItem) : String =
+    case c of
+        F2JRecordItem name expr ->
+            "F2JRecordItem \{name} \{f2jExprToString expr}"
+
+and f2jExprToString (e : F2JExpr) : String =
+    case e of
+        F2JApplication expr param ->
+            "F2JApplication \{f2jExprToString expr}, \{f2jApplicationParamToString param}"
+     |  F2JLet body expr ->
+            "F2JLet \{pListToString[F2JBindingBody] f2jBindingBodyToString body}, \{f2jExprToString expr}"
+     |  F2JLetRec body expr ->
+            "F2JLetRec \{pListToString[F2JBindingBody] f2jBindingBodyToString body}, \{f2jExprToString expr}"
+     |  F2JLambda params expr ->
+            "F2JLambda \{pListToString[F2JBindingParam] f2jBindingParamToString params}, \{f2jExprToString expr}"
+     |  F2JCase e alts ->
+            "F2JCase \{f2jExprToString e}, \{pListToString[F2JCaseAlternative] f2jCaseAlternativeToString alts}"
+     |  F2JADT body expr ->
+            "F2JADT \{pListToString[F2JADTBody] f2jADTBodyToString body}, \{f2jExprToString expr}"
+     |  F2JRecADT body expr ->
+            "F2JRecADT \{pListToString[F2JADTBody] f2jADTBodyToString body}, \{f2jExprToString expr}"
+     |  F2JTypeAlias t target expr ->
+            "F2JTypeAlias \{f2jTypeToString t}, \{f2jTypeToString target}, \{f2jExprToString expr}"
+     |  F2JPair conts ->
+            "F2JPair \{pListToString[F2JExpr] f2jExprToString conts}"
+     |  F2JIntLiteral s ->
+            "F2JIntLiteral \{s}"
+     |  F2JStringLiteral s ->
+            "F2JStringLiteral \{s}"
+     |  F2JVariable s ->
+            "F2JVariable \{s}"
+     |  F2JBlock e ->
+            "F2JBlock \{pListToString[F2JExpr] f2jExprToString e}"
+     |  F2JRecord items ->
+            "F2JRecord \{pListToString[F2JRecordItem] f2jRecordItemToString items}"
+     ;
+
+data F2JComment = F2JLineComment String
+                | F2JBlockComment String
+                ;
+
+let f2jCommentToString (tok : F2JComment) : String =
+    case tok of
+        F2JLineComment cmt         -> "F2JLineComment ".concat(cmt)
+     |  F2JBlockComment cmt        -> "F2JBlockComment ".concat(cmt);
+
+let f2jLineComment : Parser[F2JComment] =
+    (string "--")
+        *>[PString, PString]   (many[Char] (noneof "\r\n"))
+        <*[PString, Unit]      (eol <|>[Unit] eof)
+        <$>[PString, F2JComment] (\(cmt : PString) -> F2JLineComment (pStringToString cmt));
+
+let f2jBlockComment : Parser[F2JComment] =
+    let rec nested : Parser[PString] =
+        (string "{-");
+
+    (string "{-")
+        *>[PString, PString] (many[Char] item) -- Need to support nested block comment
+        <*[PString, PString] (string "-}")
+        <$>[PString, F2JComment] (\(cmt : PString) -> F2JBlockComment (pStringToString cmt));
+
+let f2jComment : Parser[F2JComment] =
+    f2jLineComment <|>[F2JComment] f2jBlockComment;
+
+let f2jSpace : Parser[Unit] =
+    many[Char] whitespace $>[PList[Char], Unit] ();
+
+let f2jSpace1 : Parser[Unit] =
+    many1[Char] whitespace $>[PList[Char], Unit] ();
+
+let f2jBetween[L, R, P] (l : Parser[L]) (r : Parser[R]) (p : Parser[P]) : Parser[P] =
+    between[L, R, P] (l <*[L, Unit] f2jSpace) (f2jSpace *>[Unit, R] r) p;
+
+let f2jInfixOpName : Parser[PString] =
+    many1[Char] (oneof "!#$%&*+./<=>?@\\^|-~");
+
+let f2jTypeName : Parser[PString] =
+    upper                                           >>=[Char, PString]      (\(x : Char) ->
+    (many[Char] (alphanum <|>[Char] (char '_')))    >>=[PString, PString]   (\(xs : PString) ->
+    result[PString] (x +>[Char] xs)));
+
+let f2jKeyword (k : String) : Parser[PString] =
+    string k;
+
+let f2jKeywordLet : Parser[PString] =
+    f2jKeyword "let";
+
+let f2jKeywordRec : Parser[PString] =
+    f2jKeyword "rec";
+
+let f2jKeywordAnd : Parser[PString] =
+    f2jKeyword "and";
+
+let f2jKeywordData : Parser[PString] =
+    f2jKeyword "data";
+
+let f2jKeywordType : Parser[PString] =
+    f2jKeyword "type";
+
+let f2jKeywordCase : Parser[PString] =
+    f2jKeyword "case";
+
+let f2jKeywordOf : Parser[PString] =
+    f2jKeyword "of";
+
+let rec f2jTypeParams : Parser[PList[F2JType]] =
+    f2jBetween[Char, Char, PList[F2JType]] (char '[') (char ']')
+        (sepby1[F2JType, Unit] f2jType (f2jSpace >>[Unit, Char] (char ',') >>[Char, Unit] f2jSpace))
+and f2jPairedType : Parser[F2JType] =
+    f2jBetween[Char, Char, F2JType] (char '(') (char ')')
+        ((sepby1[F2JType, Unit] f2jType (f2jSpace >>[Unit, Char] (char ',') >>[Char, Unit] f2jSpace))
+            >>=[PList[F2JType], F2JType] (\(types : PList[F2JType]) ->
+
+                (f2jSpace >>[Unit, F2JType] f2jFunctionTypeRest >>=[F2JType, F2JType] (\(ftypeto : F2JType) ->
+                    let ftypefrom = F2JPairedType types;
+                    result[F2JType] (F2JFunctionType ftypefrom ftypeto)))
+                <|>[F2JType]
+                (result[F2JType] (F2JPairedType types))
+            ))
+and f2jSinglePairedType : Parser[F2JType] =
+    f2jBetween[Char, Char, F2JType] (char '(') (char ')')
+        (f2jType >>=[F2JType, F2JType] (\(t : F2JType) ->
+
+            (f2jSpace >>[Unit, F2JType] f2jFunctionTypeRest >>=[F2JType, F2JType] (\(ftypeto : F2JType) ->
+                let ftypefrom = t;
+                result[F2JType] (F2JFunctionType ftypefrom ftypeto)))
+            <|>[F2JType]
+                result[F2JType] t))
+and f2jFunctionTypeRest : Parser[F2JType] =
+    (string "->") >>[PString, Unit] f2jSpace >>[Unit, F2JType] f2jType
+
+and f2jSingleType : Parser[F2JType] =
+    (f2jTypeName)                                                                                                       >>=[PString, F2JType]        (\(typename : PString) ->
+        ((f2jSpace >>[Unit, PList[F2JType]] f2jTypeParams) <|>[PList[F2JType]] (result[PList[F2JType]] (Nil[F2JType]))) >>=[PList[F2JType], F2JType] (\(tparams : PList[F2JType]) ->
+
+            (f2jSpace >>[Unit, F2JType] f2jFunctionTypeRest >>=[F2JType, F2JType] (\(ftypeto : F2JType) ->
+                let ftypefrom = F2JNormalType (pStringToString typename) tparams;
+                result[F2JType] (F2JFunctionType ftypefrom ftypeto)))
+            <|>[F2JType]
+            (result[F2JType] (F2JNormalType (pStringToString typename) tparams))
+
+        ))
+and f2jNormalType : Parser[F2JType] =
+    (f2jTypeName <*[PString, Unit] f2jSpace) >>=[PString, F2JType] (\(tstr : PString) ->
+        ((f2jTypeParams <|>[PList[F2JType]] (result[PList[F2JType]] (Nil[F2JType]))) >>=[PList[F2JType], F2JType] (\(params : PList[F2JType]) ->
+            result[F2JType] (F2JNormalType (pStringToString tstr) params))))
+
+and f2jType : Parser[F2JType] =
+        f2jSingleType
+    <|>[F2JType]
+        f2jSinglePairedType
+    <|>[F2JType]
+        f2jPairedType;
+
+let f2jBindingParam : Parser[F2JBindingParam] =
+    let seperator =
+        f2jSpace >>[Unit, Char] (char ':') >>[Char, Unit] f2jSpace;
+
+    let binding =
+        (ident <*[PString, Unit] seperator) >>=[PString, F2JBindingParam] (\(id : PString) ->
+            f2jType <$>[F2JType, F2JBindingParam] (\(t : F2JType) ->
+            F2JBindingParam (pStringToString id) t));
+
+    f2jBetween[Char, Char, F2JBindingParam] (char '(') (char ')')
+        binding;
+let f2jBindingParams : Parser[PList[F2JBindingParam]] =
+    sepby[F2JBindingParam, Unit] f2jBindingParam f2jSpace;
+
+let f2jBindingName : Parser[PString] =
+        ident
+    <|>[PString]
+        f2jBetween[Char, Char, PString] (char '(') (char ')') f2jInfixOpName;
+
+let rec f2jIntLiterial : Parser[F2JExpr] =
+    let nat : Parser[PString] =
+        many1[Char] digit;
+    (nat <|>[PString]
+        (char '-' >>=[Char, PString]
+            (\(minus : Char) -> nat >>=[PString, PString]
+                (\(n : PString) -> result[PString] (minus +>[Char] n)))))
+    <$>[PString, F2JExpr]
+        (\(nstr : PString) -> F2JIntLiteral (pStringToString nstr));
+
+let f2jVariable : Parser[F2JExpr] =
+    let f2jVariableName : Parser[PString] =
+            ident
+        <|>[PString]
+            f2jInfixOpName;
+
+    let rec f2jVariable' : Parser[F2JExpr] =
+        let f2jVariableWithBracket : Parser[F2JExpr] =
+            f2jBetween[Char, Char, F2JExpr] (char '(') (char ')') f2jVariable';
+        (f2jVariableName <$>[PString, F2JExpr] (\(s : PString) -> F2JVariable (pStringToString s)))
+            <|>[F2JExpr] f2jVariableWithBracket;
+
+    only[F2JExpr] f2jVariable';
+
+let f2jADTBody : Parser[F2JADTBody] =
+    let f2jADTAlternative : Parser[F2JADTAlternative] =
+        (f2jTypeName <*[PString, Unit] f2jSpace) >>=[PString, F2JADTAlternative] (\(tname : PString) ->
+            (sepby[F2JType, Unit] f2jType f2jSpace) >>=[PList[F2JType], F2JADTAlternative] (\(types : PList[F2JType]) ->
+                result[F2JADTAlternative] (F2JADTAlternative (pStringToString tname) types)));
+
+    let f2jADTRecordItem : Parser[F2JADTRecordItem] =
+        ident <*[PString, Unit] (f2jSpace >>[Unit, Char] (char ':') >>[Char, Unit] f2jSpace)
+            >>=[PString, F2JADTRecordItem] (\(name : PString) ->
+                f2jType >>=[F2JType, F2JADTRecordItem] (\(t : F2JType) ->
+                    result[F2JADTRecordItem] (F2JADTRecordItem (pStringToString name) t)));
+
+    let f2jADTBodyRecord : Parser[PList[F2JADTRecordItem]] =
+        f2jBetween[Char, Char, PList[F2JADTRecordItem]] (char '{') (char '}')
+            (sepby1[F2JADTRecordItem, Unit] f2jADTRecordItem
+                (f2jSpace >>[Unit, Char] (char ',') >>[Char, Unit] f2jSpace));
+
+    (f2jNormalType <*[F2JType, Unit] (f2jSpace >>[Unit, Char] (char '=') >>[Char, Unit] f2jSpace))
+        >>=[F2JType, F2JADTBody] (\(t : F2JType) ->
+            (sepby1[F2JADTAlternative, Unit] f2jADTAlternative (f2jSpace >>[Unit, Char] (char '|') >>[Char, Unit] f2jSpace)
+                >>=[PList[F2JADTAlternative], F2JADTBody] (\(alts : PList[F2JADTAlternative]) ->
+                    result[F2JADTBody] (F2JADTNormalBody t alts)))
+
+            <|>[F2JADTBody]
+
+            (f2jADTBodyRecord >>=[PList[F2JADTRecordItem], F2JADTBody] (\(items : PList[F2JADTRecordItem]) ->
+                result[F2JADTBody] (F2JADTRecordBody t items)))
+        );
+
+let rec f2jTypeAlias : Parser[F2JExpr] =
+    ((string "type") <*[PString, Unit] f2jSpace)
+        >>[PString, F2JType] f2jNormalType >>=[F2JType, F2JExpr] (\(t : F2JType) ->
+            (f2jSpace >>[Unit, Char] (char '=') >>[Char, Unit] f2jSpace)
+                >>[Unit, F2JType] f2jType >>=[F2JType, F2JExpr] (\(tar : F2JType) ->
+                    (f2jSpace >>[Unit, Char] (char ';') >>[Char, Unit] f2jSpace)
+                        >>[Unit, F2JExpr] f2jExpr >>=[F2JExpr, F2JExpr] (\(expr : F2JExpr) ->
+                            result[F2JExpr] (F2JTypeAlias t tar expr))))
+
+and f2jADT : Parser[F2JExpr] =
+    let innerBody : Parser[(PList[F2JADTBody], F2JExpr)] =
+        ((sepby1[F2JADTBody, PString] f2jADTBody (f2jSpace *>[Unit, PString] f2jKeywordAnd <*[PString, Unit] f2jSpace))
+            >>=[PList[F2JADTBody], (PList[F2JADTBody], F2JExpr)] (\(ands : PList[F2JADTBody]) ->
+                (f2jSpace >>[Unit, Char] (char ';') >>[Char, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr)
+                    >>=[F2JExpr, (PList[F2JADTBody], F2JExpr)] (\(expr : F2JExpr) ->
+                        result[(PList[F2JADTBody], F2JExpr)] (ands, expr))));
+
+    (f2jKeywordData >>[PString, Unit] f2jSpace) >>[Unit, F2JExpr]
+        (
+            f2jKeywordRec >>[PString, Unit] f2jSpace >>[Unit, (PList[F2JADTBody], F2JExpr)]
+                innerBody <$>[(PList[F2JADTBody], F2JExpr), F2JExpr]
+                    (\(x : (PList[F2JADTBody], F2JExpr)) -> F2JRecADT x._1 x._2)
+            <|>[F2JExpr]
+            (innerBody <$>[(PList[F2JADTBody], F2JExpr), F2JExpr]
+                (\(x : (PList[F2JADTBody], F2JExpr)) -> F2JADT x._1 x._2))
+        )
+
+and f2jPair : Parser[F2JExpr] =
+    f2jBetween[Char, Char, PList[F2JExpr]] (char '(') (char ')')
+        (sepby2[F2JExpr, Unit] f2jExpr (f2jSpace >>[Unit, Char] (char ',') >>[Char, Unit] f2jSpace))
+        <$>[PList[F2JExpr], F2JExpr] (\(exprs : PList[F2JExpr]) -> F2JPair exprs)
+
+
+and f2jLambda : Parser[F2JExpr] =
+    ((char '\\') >>[Char, Unit] f2jSpace)
+        >>[Unit, PList[F2JBindingParam]] f2jBindingParams >>=[PList[F2JBindingParam], F2JExpr] (\(params : PList[F2JBindingParam]) ->
+            (f2jSpace >>[Unit, PString] (string "->") >>[PString, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr
+                >>=[F2JExpr, F2JExpr] (\(expr : F2JExpr) ->
+                    result[F2JExpr] (F2JLambda params expr))))
+
+and f2jApplication : Parser[F2JExpr] =
+    let rec f2jApplicationParam : Parser[F2JApplicationParam] =
+        let f2jApplicationParamWithBracket : Parser[F2JApplicationParam] =
+            f2jBetween[Char, Char, F2JApplicationParam] (char '(') (char ')')
+                f2jApplicationParam;
+
+            (f2jExpr <$>[F2JExpr, F2JApplicationParam] (\(expr : F2JExpr) -> F2JApplicationParamExpr expr))
+        <|>[F2JApplicationParam]
+            (f2jTypeParams <$>[PList[F2JType], F2JApplicationParam] (\(t : PList[F2JType]) -> F2JApplicationParamType t))
+        <|>[F2JApplicationParam]
+            (f2jApplicationParamWithBracket);
+
+    f2jExprWithoutApplication >>=[F2JExpr, F2JExpr] (\(leftmost : F2JExpr) ->
+        many1[F2JApplicationParam] (f2jSpace >>[Unit, F2JApplicationParam] f2jApplicationParam)
+            >>=[PList[F2JApplicationParam], F2JExpr] (\(params : PList[F2JApplicationParam]) ->
+                if isempty[F2JApplicationParam] params then
+                    (result[F2JExpr] leftmost)
+                else
+                    (result[F2JExpr] (foldl[F2JApplicationParam, F2JExpr] (\(b : F2JExpr) (a : F2JApplicationParam) -> F2JApplication b a) leftmost params))))
+
+and f2jBlockOrRecord : Parser[F2JExpr] =
+    let f2jRecordItem : Parser[F2JRecordItem] =
+        ident <*[PString, Unit] (f2jSpace >>[Unit, Char] (char '=') >>[Char, Unit] f2jSpace)
+            >>=[PString, F2JRecordItem] (\(name : PString) ->
+                f2jExpr >>=[F2JExpr, F2JRecordItem] (\(expr : F2JExpr) ->
+                    result[F2JRecordItem] (F2JRecordItem (pStringToString name) expr)));
+
+    f2jBetween[Char, Char, F2JExpr] (char '{') (char '}')
+        (
+            ((sepby1[F2JExpr, Char] f2jExpr (f2jSpace *>[Unit, Char] (char ';') <*[Char, Unit] f2jSpace))
+                <$>[PList[F2JExpr], F2JExpr] (\(e : PList[F2JExpr]) -> F2JBlock e))
+
+            <|>[F2JExpr]
+
+            ((sepby1[F2JRecordItem, Char] f2jRecordItem (f2jSpace *>[Unit, Char] (char ',') <*[Char, Unit] f2jSpace))
+                <$>[PList[F2JRecordItem], F2JExpr] (\(items : PList[F2JRecordItem]) -> F2JRecord items))
+        )
+
+and f2jLet : Parser[F2JExpr] =
+    let f2jLetOptionalTypeParams : Parser[PList[F2JType]] =
+        f2jTypeParams <|>[PList[F2JType]] (result[PList[F2JType]] (Nil[F2JType]));
+
+    let f2jLetOptionalBindingParams : Parser[PList[F2JBindingParam]] =
+        f2jBindingParams <|>[PList[F2JBindingParam]] (result[PList[F2JBindingParam]] (Nil[F2JBindingParam]));
+
+    let f2jLetBindingBody : Parser[F2JBindingBody] =
+        (f2jBindingName <*[PString, Unit] f2jSpace)                                >>=[PString, F2JBindingBody]                    (\(name : PString) ->
+        (f2jLetOptionalTypeParams <*[PList[F2JType], Unit] f2jSpace)               >>=[PList[F2JType], F2JBindingBody]             (\(tparams : PList[F2JType]) ->
+        (f2jLetOptionalBindingParams <*[PList[F2JBindingParam], Unit] f2jSpace)    >>=[PList[F2JBindingParam], F2JBindingBody]     (\(bparams : PList[F2JBindingParam]) ->
+        (((char ':') >>[Char, Unit] f2jSpace >>[Unit, F2JType] f2jNormalType <$>[F2JType, Maybe[F2JType]] (\(t : F2JType) -> Just[F2JType] t))
+            <|>[Maybe[F2JType]] (result[Maybe[F2JType]] (Nothing[F2JType])))
+                                                                        >>=[Maybe[F2JType], F2JBindingBody]             (\(rettype : Maybe[F2JType]) ->
+        (f2jSpace >>[Unit, Char] (char '=') >>[Char, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr)  >>=[F2JExpr, F2JBindingBody]                    (\(expr : F2JExpr) ->
+        result[F2JBindingBody] (F2JLetBindingBody (pStringToString name) tparams bparams rettype expr))))));
+
+    let f2jLetRecBindingBody : Parser[F2JBindingBody] =
+        (f2jBindingName <*[PString, Unit] f2jSpace)                                >>=[PString, F2JBindingBody]                    (\(name : PString) ->
+        (f2jLetOptionalTypeParams <*[PList[F2JType], Unit] f2jSpace)               >>=[PList[F2JType], F2JBindingBody]             (\(tparams : PList[F2JType]) ->
+        (f2jLetOptionalBindingParams <*[PList[F2JBindingParam], Unit] f2jSpace)    >>=[PList[F2JBindingParam], F2JBindingBody]     (\(bparams : PList[F2JBindingParam]) ->
+        ((char ':') >>[Char, Unit] f2jSpace >>[Unit, F2JType] f2jNormalType)>>=[F2JType, F2JBindingBody]                    (\(rettype : F2JType) ->
+        (f2jSpace >>[Unit, Char] (char '=') >>[Char, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr)      >>=[F2JExpr, F2JBindingBody]                    (\(expr : F2JExpr) ->
+        result[F2JBindingBody] (F2JLetRecBindingBody (pStringToString name) tparams bparams rettype expr))))));
+
+    (f2jKeywordLet >>[PString, Unit] f2jSpace) >>[Unit, F2JExpr]
+        (
+            ((f2jKeywordRec >>[PString, Unit] f2jSpace >>[Unit, PList[F2JBindingBody]]
+                sepby1[F2JBindingBody, PString] f2jLetRecBindingBody (f2jSpace *>[Unit, PString] f2jKeywordAnd <*[PString, Unit] f2jSpace))
+                    >>=[PList[F2JBindingBody], F2JExpr] (\(bodies : PList[F2JBindingBody]) ->
+                        (f2jSpace >>[Unit, Char] (char ';') >>[Char, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr)
+                            >>=[F2JExpr, F2JExpr] (\(expr : F2JExpr) ->
+                                result[F2JExpr] (F2JLetRec bodies expr))))
+            <|>[F2JExpr]
+            ((sepby1[F2JBindingBody, PString] f2jLetBindingBody (f2jSpace *>[Unit, PString] f2jKeywordAnd <*[PString, Unit] f2jSpace))
+                    >>=[PList[F2JBindingBody], F2JExpr] (\(bodies : PList[F2JBindingBody]) ->
+                        (f2jSpace >>[Unit, Char] (char ';') >>[Char, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr)
+                            >>=[F2JExpr, F2JExpr] (\(expr : F2JExpr) ->
+                                result[F2JExpr] (F2JLet bodies expr))))
+        )
+
+and f2jCase : Parser[F2JExpr] =
+    let f2jCaseAlternative : Parser[F2JCaseAlternative] =
+        (f2jTypeName <*[PString, Unit] f2jSpace) >>=[PString, F2JCaseAlternative]
+            (\(name : PString) ->
+                (sepby[PString, Unit] ident f2jSpace1) >>=[PList[PString], F2JCaseAlternative]
+                    (\(vars : PList[PString]) ->
+                        (f2jSpace >>[Unit, PString] (string "->") >>[PString, Unit] f2jSpace >>[Unit, F2JExpr] f2jExpr) >>=[F2JExpr, F2JCaseAlternative]
+                            (\(expr : F2JExpr) ->
+                                result[F2JCaseAlternative] (F2JCaseAlternative (pStringToString name) (map[PString, String] pStringToString vars) expr))));
+
+    let body : Parser[PList[F2JCaseAlternative]] =
+        sepby1[F2JCaseAlternative, Unit] f2jCaseAlternative (f2jSpace >>[Unit, Char] (char '|') >>[Char, Unit] f2jSpace);
+
+    (f2jKeywordCase >>[PString, Unit] f2jSpace1) >>[Unit, F2JExpr] f2jExpr <*[F2JExpr, Unit] (f2jSpace1 >>[Unit, PString] f2jKeywordOf >>[PString, Unit] f2jSpace)
+        >>=[F2JExpr, F2JExpr] (\(expr : F2JExpr) ->
+            body >>=[PList[F2JCaseAlternative], F2JExpr] (\(b : PList[F2JCaseAlternative]) ->
+                result[F2JExpr] (F2JCase expr b)))
+
+and f2jExprWithBracket : Parser[F2JExpr] =
+    f2jBetween[Char, Char, F2JExpr] (char '(') (char ')') f2jExpr
+
+and f2jExprWithoutApplication : Parser[F2JExpr] =
+        f2jIntLiterial
+    <|>[F2JExpr]
+        f2jTypeAlias
+    <|>[F2JExpr]
+        f2jADT
+    <|>[F2JExpr]
+        f2jPair
+    <|>[F2JExpr]
+        f2jLet
+    <|>[F2JExpr]
+        f2jVariable
+    <|>[F2JExpr]
+        f2jBlockOrRecord
+    <|>[F2JExpr]
+        f2jCase
+    <|>[F2JExpr]
+        f2jExprWithBracket
+
+and f2jExpr : Parser[F2JExpr] =
+        f2jExprWithoutApplication
+    <|>[F2JExpr]
+        f2jApplication
+
+and f2jProgram : Parser[F2JExpr] =
+
+    let rec discard (res : ParseOutput[F2JExpr]) : ParseOutput[F2JExpr] =
+        case res of
+            Nil             -> res
+         |  Cons x xs       ->
+                if isempty[Char] x._2._2 then
+                    singleton[ParseContext[F2JExpr]] x
+                else
+                    discard (invoke[ParseOutput[F2JExpr]] xs);
+
+    \(inp : ParseInput) -> discard (f2jExpr inp)
+;
+
+let printFirstF2JParseResult (l : ParseOutput[F2JExpr]) =
+    let result =
+        case l of
+            Nil             -> "Empty result!"
+         |  Cons x _        -> "Result: \{f2jExprToString x._1}\nRemains: \{parseInputToString x._2}";
+
+    println result;
+
+let testF2JParserComment : TestFn = {
+    name = "Single line comment\t`-- abchahaha`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JComment]
+            f2jCommentToString
+            (f2jComment `parsePString[F2JComment]` (pStringFromString "-- abchahaha")))
+    }
+};
+
+let testF2JParserCommentMultipleLines : TestFn = {
+    name = "Multiple line comment",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JComment]
+            f2jCommentToString
+            (f2jComment `parsePString[F2JComment]` (pStringFromString "-- abchahaha\n-- second line\nnormal")))
+    }
+};
+
+let testF2JParserBlockComment : TestFn = {
+    name = "Block comment",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JComment]
+                    f2jCommentToString
+                    (f2jComment `parsePString[F2JComment]` (pStringFromString "{- abchahaha -}")))
+    }
+};
+
+let testF2JParserType : TestFn = {
+    name = "Type\t`A[B, C[D]]`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JType]
+            f2jTypeToString
+            (f2jType `parsePString[F2JType]` (pStringFromString "A[B, C[D]]")))
+    }
+};
+
+let testF2JParserPairedType : TestFn = {
+    name = "Paired type\t`(A, B)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JType]
+            f2jTypeToString
+            (f2jType `parsePString[F2JType]` (pStringFromString "(A, B)")))
+    }
+};
+
+let testF2JParserFunctionType : TestFn = {
+    name = "Function type\t`(A[C] -> B)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JType]
+            f2jTypeToString
+            (f2jType `parsePString[F2JType]` (pStringFromString "(A[C] -> B)")))
+    }
+};
+
+let testF2JParserFunctionType2 : TestFn = {
+    name = "Function type\t`A -> B`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JType]
+            f2jTypeToString
+            (f2jType `parsePString[F2JType]` (pStringFromString "A -> B")))
+    }
+};
+
+let testF2JParserBindParam : TestFn = {
+    name = "Binding parameter\t`(a : PList[A])`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JBindingParam]
+            f2jBindingParamToString
+            (f2jBindingParam `parsePString[F2JBindingParam]` (pStringFromString "(a : PList[A])")))
+    }
+};
+
+let testF2JParserBindParams : TestFn = {
+    name = "Binding parameters\t`(a : PList[A]) (b : PString)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[PList[F2JBindingParam]]
+            (pListToString[F2JBindingParam] f2jBindingParamToString)
+            (f2jBindingParams `parsePString[PList[F2JBindingParam]]` (pStringFromString "(a : PList[A]) (b : PString)")))
+    }
+};
+
+let testF2JParserTypeAlias : TestFn = {
+    name = "Type alias\t`type Ha[A] = Fucker; 123`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jTypeAlias `parseString[F2JExpr]` "type Ha[A] = Fucker; 123"))
+    }
+};
+
+let testF2JParserADT : TestFn = {
+    name = "ADT\t`data PList[A] = Nil | Cons A (PList[A]) and X = X; 1`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jADT `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]) and X = X; 1"))
+    }
+};
+
+let testF2JParserADTRecord : TestFn = {
+    name = "ADT\t`data X = { name : String, age : Int }; 1`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jADT `parseString[F2JExpr]` "data X = { name : String, age : Int }; 1"))
+    }
+};
+
+
+let testF2JParserPair : TestFn = {
+    name = "Pair\t`(1,2,3)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jPair `parseString[F2JExpr]` "(1,2,3)"))
+    }
+};
+
+let testF2JParserLambda : TestFn = {
+    name = "Lambda\t`\\(a : A) -> 1`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jLambda `parseString[F2JExpr]` "\\(a : A) -> 1"))
+    }
+};
+
+let testF2JParserLet : TestFn = {
+    name = "Let\t`let fn[A] (a : A) : A = a; fn`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jLet `parseString[F2JExpr]` "let fn[A] (a : A) : A = a; fn"))
+    }
+};
+
+let testF2JParserLet2 : TestFn = {
+    name = "Let\t`let x = x; 1`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jLet `parseString[F2JExpr]` "let x = x; 1"))
+    }
+};
+
+let testF2JParserLetRec : TestFn = {
+    name = "LetRec\t`let rec fn[A] (a : A) : A = a; fn`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jLet `parseString[F2JExpr]` "let rec fn[A] (a : A) : A = a; fn"))
+    }
+};
+
+let testF2JParserLetRec2 : TestFn = {
+    name = "LetRec\t`let rec r[A] (a : A) : A = r[A] a; 1`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jLet `parseString[F2JExpr]` "let rec r[A] (a : A) : A = r[A] a; 1"))
+    }
+};
+
+let testF2JParserIntLiteral : TestFn = {
+    name = "Integer Literal\t`123`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+            f2jExprToString
+            (f2jIntLiterial `parseString[F2JExpr]` "123"))
+    }
+};
+
+let testF2JParserApplication : TestFn = {
+    name = "Application\t`a b`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jApplication `parseString[F2JExpr]` "a b"))
+    }
+};
+
+let testF2JParserApplication2 : TestFn = {
+    name = "Application\t`(a b)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "(a b)"))
+    }
+};
+
+let testF2JParserApplication3 : TestFn = {
+    name = "Application\t`a b c`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "a b c"))
+    }
+};
+
+let testF2JParserApplication4 : TestFn = {
+    name = "Application\t`a (b c)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "a (b c)"))
+    }
+};
+
+let testF2JParserApplication5 : TestFn = {
+    name = "Application\t`let x = x; a (b c)`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "let x = x; a (b c)"))
+    }
+};
+
+let testF2JParserApplication6 : TestFn = {
+    name = "Application\t`a[A]`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "a[A]"))
+    }
+};
+
+let testF2JParserApplication7 : TestFn = {
+    name = "Application\t`a[A] b`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jExpr `parseString[F2JExpr]` "a[A] b"))
+    }
+};
+
+let testF2JParserCase : TestFn = {
+    name = "Case\t`case l of Nil -> 1 | Cons x xs -> 2`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jCase `parseString[F2JExpr]` "case l of Nil -> 1 | Cons x xs -> 2"))
+    }
+};
+
+let testF2JParserBlock : TestFn = {
+    name = "Block\t`{a; b}`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jBlockOrRecord `parseString[F2JExpr]` "{a; b}"))
+    }
+};
+
+let testF2JParserRecord : TestFn = {
+    name = "Block\t`{ x = 1, y = 2 }`",
+    fn   = \(x : Unit) -> {
+        println (parseOutputToString[F2JExpr]
+                    f2jExprToString
+                    (f2jBlockOrRecord `parseString[F2JExpr]` "{ x = 1, y = 2 }"))
+    }
+};
+
+let testF2JFull : TestFn = {
+    name = "Full test\t`let x = x; data PList[A] = Nil | Cons A (PList[A]); data X = X; {a; b}`",
+    fn   = \(x : Unit) -> {
+        printFirstF2JParseResult
+            (f2jExpr `parseString[F2JExpr]` "let x = x; data PList[A] = Nil | Cons A (PList[A]); data X = X; {a; b}")
+    }
+};
+
+let testF2JFull2 : TestFn = {
+    name = "Full test\t`data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1`",
+    fn   = \(x : Unit) -> {
+        printFirstF2JParseResult
+            (f2jExpr `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+    }
+};
+
+let testF2JFull3 : TestFn = {
+    name = "Full test\t`data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1`",
+    fn   = \(x : Unit) -> {
+        printFirstF2JParseResult
+            (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+    }
+};
+
+
+let testF2JParserSuite : TestSuite = {
+    name = "Test F2J Parser",
+    fns  = testF2JParserComment
+            +>[TestFn] (testF2JParserCommentMultipleLines
+            +>[TestFn] (testF2JParserBlockComment
+            +>[TestFn] (testF2JParserType
+            +>[TestFn] (testF2JParserPairedType
+            +>[TestFn] (testF2JParserFunctionType
+            +>[TestFn] (testF2JParserFunctionType2
+            +>[TestFn] (testF2JParserBindParam
+            +>[TestFn] (testF2JParserBindParams
+            +>[TestFn] (testF2JParserTypeAlias
+            +>[TestFn] (testF2JParserADT
+            +>[TestFn] (testF2JParserADTRecord
+            +>[TestFn] (testF2JParserPair
+            +>[TestFn] (testF2JParserLambda
+            +>[TestFn] (testF2JParserLet
+            +>[TestFn] (testF2JParserLet2
+            +>[TestFn] (testF2JParserLetRec
+            +>[TestFn] (testF2JParserLetRec2
+            +>[TestFn] (testF2JParserIntLiteral
+            +>[TestFn] (testF2JParserApplication
+            +>[TestFn] (testF2JParserApplication2
+            +>[TestFn] (testF2JParserApplication3
+            +>[TestFn] (testF2JParserApplication4
+            +>[TestFn] (testF2JParserApplication5
+            +>[TestFn] (testF2JParserApplication6
+            +>[TestFn] (testF2JParserApplication7
+            +>[TestFn] (testF2JParserCase
+            +>[TestFn] (testF2JParserBlock
+            +>[TestFn] (testF2JParserRecord
+            +>[TestFn] (testF2JFull
+            +>[TestFn] (testF2JFull2
+            +>[TestFn] (testF2JFull3
+            +>[TestFn] (Nil[TestFn]))))))))))))))))))))))))))))))))
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let parserTestSuites : PList[TestSuite] =
+    testUtilitiesSuite
+        +>[TestSuite] (testCombinatorsSuite
+        +>[TestSuite] (testSimpleArithmetricExprSuite
+        +>[TestSuite] (testNaiveXMLParserSuite
+        +>[TestSuite] (testF2JParserSuite
+        +>[TestSuite] (Nil[TestSuite])))));
+
+{
+    runTestSuites parserTestSuites;
+
+    "\n-- END --"
+}
