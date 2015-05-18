@@ -1,7 +1,6 @@
 {-#
     INCLUDE "F2JToDocument.sf"
     INCLUDE "TestLib.sf"
-    INCLUDE "f2j_parser.sf"
 #-}
 
 

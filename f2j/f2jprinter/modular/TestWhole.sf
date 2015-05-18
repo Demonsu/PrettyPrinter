@@ -1,7 +1,8 @@
 {-#
+	INCLUDE "f2j_parser.sf"
     INCLUDE "F2JToDocument.sf"
     INCLUDE "TestLib.sf"
-    INCLUDE "f2j_parser.sf"
+
 #-}
 
 let printFirstF2JParseResult (l : ParseOutput[F2JExpr]) =

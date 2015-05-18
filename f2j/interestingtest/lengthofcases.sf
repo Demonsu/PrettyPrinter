@@ -9,7 +9,7 @@ data F2JCaseAlternative = F2JCaseAlternative String PList[String]
 
 let rec lengOfPListString (strs: PList[String]): Int=
     case strs of
-        Cons x xs -> length(x) + 1 + lengOfPListString(xs)
+        Cons x xs -> x.length() + 1 + lengOfPListString(xs)
     |   Nil       -> 0
 
 ;
@@ -18,7 +18,7 @@ let max (a: Int) (b: Int) : Int=
 ;
 let rec lengOfF2JCaseAlternative (ca: F2JCaseAlternative): Int=
     case ca of 
-            F2JCaseAlternative dataname params  -> (length (dataname)) + 1 + (lengOfPListString params)
+            F2JCaseAlternative dataname params  -> (dataname.length()) + 1 + (lengOfPListString params)
     
 and
 lengOfF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Int=

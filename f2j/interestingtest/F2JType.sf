@@ -6,7 +6,6 @@ let (+>)[A] (a: A)(l: PList[A]): PList[A]=
 	Cons[A] a l
 ;
 
-
 data F2JType = F2JNormalType    String PList[F2JType]
              | F2JPairedType    PList[F2JType]
              | F2JFunctionType  F2JType F2JType
