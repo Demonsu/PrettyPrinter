@@ -219,13 +219,31 @@ let testF2JExprF2JRecADT : TestFn = {
 }
 ;
 
+--F2JApplication
+let f2jexpr_app = F2JApplication (F2JVariable "text") (F2JApplicationParamExpr (F2JVariable "s"))
+;
+let f2jexpr_app1 = F2JApplication (F2JVariable "<>") (
+					F2JApplicationParamExpr
+						(F2JPair
+						(Cons[F2JExpr]   
+						(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type1")))
+							(Cons[F2JExpr]
+								(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type2")))
+								(Nil[F2JExpr])
+							)
+						))
+	)
+;
+let f2jexpr_app2 = F2JApplication (F2JVariable "showF2JTypes") (F2JApplicationParamExpr (F2JVariable "types"))
+;
+
 --F2JCase               F2JExpr                  PList[F2JCaseAlternative]
 --F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
-let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (F2JVariable "s")
+let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (f2jexpr_app)
 ;
-let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (F2JStringLiteral "showF2JType type1 <> showF2JType type2")
+let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (f2jexpr_app1)
 ;
-let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (F2JStringLiteral "showF2JTypes types")
+let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (f2jexpr_app2)
 ;
 let casealternatives= Cons[F2JCaseAlternative] casealternative1 (Cons[F2JCaseAlternative] casealternative2 (Cons[F2JCaseAlternative] casealternative3 (Nil[F2JCaseAlternative]) ))
 ;

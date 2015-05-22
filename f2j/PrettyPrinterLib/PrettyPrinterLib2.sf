@@ -9,6 +9,7 @@ data Doc =	NIL
 let nil = NIL
 ;
 
+-- union operation
 let (<|>) (x: Doc) (y: Doc) : Doc =
 	UNION x y
 ;
@@ -22,6 +23,7 @@ let line: Doc =
 	LINE 0 NIL
 ;
 
+-- union laws
 let rec (<>) (x: Doc) (y: Doc) : Doc =
 	case x of
 			UNION a b	-> (a <> y) <|> (b <> y)
@@ -38,6 +40,8 @@ let rec nest (i: Int) (x: Doc): Doc =
 		|	NIL 		-> NIL
 ;
 
+-- kill all the line, replace with sapce
+
 let rec flatten (d: Doc): Doc =
 	case d of
 			NIL 			-> NIL
@@ -46,17 +50,17 @@ let rec flatten (d: Doc): Doc =
 		|	UNION x y		-> flatten x
 ;
 
+-- new api for user, tell lib where you want minimum line nums
+
 let rec group (d: Doc): Doc =
-	case d of
-			NIL 			-> NIL
-		|	LINE i x		-> UNION (TEXT " " (flatten x)) d
-		| 	TEXT s x		-> TEXT s (group x)
-		|	UNION x y 		-> UNION (group x) y
+	flatten d <|> d
 ;
+
+-- judge whther the doc fit the line width
 
 let rec fits (w: Int) (d: Doc): Bool=
 	if w < 0 then False
-	else
+	else 
 		case d of
 				NIL 			-> True
 			|	TEXT s x 		-> fits (w - s.length()) x
@@ -64,10 +68,14 @@ let rec fits (w: Int) (d: Doc): Bool=
 			|	UNION _  _		-> False
 ;
 
+-- return a better one, here better means max width within limit 
+
 let better (w: Int) (k: Int) (x: Doc) (y: Doc): Doc =
 	if fits (w - k) x then x
 	else  y
 ;
+
+-- return the best layout among groups
 
 let rec best (w: Int) (k: Int) (d: Doc): Doc =
 	case d of
@@ -101,7 +109,12 @@ let pretty (w: Int) (d: Doc): String =
 	showDoc (best w 0 d)
 ;
 
+-- utility functions
 
+let bracket (l: String) (d: Doc) (r: String): Doc =
+	group (text l <> (nest 2 (line <> d)) <> line <> text r)
+
+;
 -- tree definition
 
 data PList[A] = Nill
@@ -121,8 +134,7 @@ and
 showBracket (tree: PList[BTree]): Doc=
 	case tree of
 			Nill 		-> nil
-		|	Cons x xs	-> (text "[") <> (nest 2 ((line) <> (showTrees (x +>[BTree] xs))))
-							<> (line) <> (text "]")
+		|	Cons x xs	-> bracket "[" (showTrees (x +>[BTree] xs)) "]"
 and
 showTrees (tree: PList[BTree]): Doc=
 	case tree of
@@ -149,5 +161,5 @@ let tree3 = Node "aaa"
 	(Cons[BTree] (Node "bbb" (Nill[BTree])) (Nill[BTree]))
 ;
 
-pretty 1 (group (showTree tree))
+pretty 20 (showTree tree2)
 --showDoc(showTree tree)

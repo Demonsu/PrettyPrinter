@@ -8,8 +8,6 @@ let rec readPolyList(s: String): PolyList[Int] =
 	else (Cons[Int] 1 (readPolyList("")));
 
 
-let convert (p:PolyList[Int]) : Int=
-1
-;
+
 --readTestCases("")
-convert (readPolyList "hello")
+readPolyList "hello"

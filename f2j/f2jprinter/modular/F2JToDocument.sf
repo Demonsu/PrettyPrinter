@@ -296,7 +296,7 @@ and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]) (maxLen: Int): Doc=
 and showF2JExpr (expr: F2JExpr): Doc=
 	case expr of
 		-- Parser of application still not be done
-			F2JApplication f2jexpr apparm 			-> showF2JExpr f2jexpr <> showF2JApplicationParam apparm
+			F2JApplication f2jexpr apparm 			-> text "(" <> showF2JExpr f2jexpr <> text " " <> showF2JApplicationParam apparm <> text ")"
 		-- One let xx; One F2JLet; PList for let xx and yy;
 		|	F2JLet bindingbodys f2jexpr 			-> text "let " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		-- Support: case default
@@ -321,9 +321,13 @@ and showF2JExprs (exprs: PList[F2JExpr]): Doc=
 	-- Haha, we'll discuss it later
 	-- text "--ExprList is TODO" <> line
 	case exprs of
-			Nil 		-> NIL
-		|	Cons x xs	-> showF2JExpr x <> showF2JExprs xs
-
+			Nil 				-> NIL
+		|	Cons x xs			-> 
+			{
+				case xs of
+					Nil 		-> showF2JExpr x
+				|	Cons y ys 	-> showF2JExpr x <> text " " <> showF2JExprs (y +> ys)
+			}
 ;
 
 

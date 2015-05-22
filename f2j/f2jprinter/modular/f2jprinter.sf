@@ -68,7 +68,7 @@ data F2JType = F2JNormalType    String PList[F2JType]
 ;
 
 
-let lengF2JType (ftype: F2JType): Int=
+let lengF2JType (ftype: F2JType): Int =
 	case ftype of
 			F2JNormalType name types -> name.length()
 		|	F2JPairedType types		 -> 4
@@ -313,7 +313,7 @@ and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]) (maxLen: Int): Doc=
 			}
 and showF2JExpr (expr: F2JExpr): Doc=
 	case expr of
-			F2JApplication f2jexpr apparm 			-> showF2JExpr f2jexpr <> showF2JApplicationParam apparm
+			F2JApplication f2jexpr apparm 			-> text "(" <> showF2JExpr f2jexpr <> text " " <> showF2JApplicationParam apparm <> text ")"
 		|	F2JLet bindingbodys f2jexpr 			-> text "let " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		|	F2JLetRec bindingbodys f2jexpr 			-> text "let rec " <> showF2JBindingBodys bindingbodys <> line <> text ";" <> line <> showF2JExpr f2jexpr
 		|	F2JLambda bindingparams f2jexpr 		-> text "\\" <> showF2JBindingParams bindingparams <> text " -> " <> showF2JExpr f2jexpr
@@ -330,9 +330,13 @@ and showF2JExpr (expr: F2JExpr): Doc=
 
 and showF2JExprs (exprs: PList[F2JExpr]): Doc=
 	case exprs of
-			Nil 		-> NIL
-		|	Cons x xs	-> showF2JExpr x <> showF2JExprs xs
-
+			Nil 				-> NIL
+		|	Cons x xs			-> 
+			{
+				case xs of
+					Nil 		-> showF2JExpr x
+				|	Cons y ys 	-> showF2JExpr x <> text " " <> showF2JExprs (y +> ys)
+			}
 ;
 
 
@@ -562,11 +566,28 @@ let testF2JExprF2JRecADT : TestFn = {
 }
 ;
 
-let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (F2JVariable "s")
+let f2jexpr_app = F2JApplication (F2JVariable "text") (F2JApplicationParamExpr (F2JVariable "s"))
 ;
-let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (F2JStringLiteral "showF2JType type1 <> showF2JType type2")
+let f2jexpr_app1 = F2JApplication (F2JVariable "<>") (
+					F2JApplicationParamExpr
+						(F2JPair
+						(Cons[F2JExpr]   
+						(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type1")))
+							(Cons[F2JExpr]
+								(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type2")))
+								(Nil[F2JExpr])
+							)
+						))
+	)
 ;
-let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (F2JStringLiteral "showF2JTypes types")
+let f2jexpr_app2 = F2JApplication (F2JVariable "showF2JTypes") (F2JApplicationParamExpr (F2JVariable "types"))
+;
+
+let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (f2jexpr_app)
+;
+let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (f2jexpr_app1)
+;
+let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (f2jexpr_app2)
 ;
 let casealternatives= Cons[F2JCaseAlternative] casealternative1 (Cons[F2JCaseAlternative] casealternative2 (Cons[F2JCaseAlternative] casealternative3 (Nil[F2JCaseAlternative]) ))
 ;
