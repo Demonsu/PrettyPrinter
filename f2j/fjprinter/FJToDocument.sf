@@ -98,10 +98,105 @@ showDefs (defs : PList[(FJIdentifier, Maybe[FJExpr])]) : Doc =
 
 let showFJVariableDef (vd : FJVariableDef) : Doc =
 	case vd of
-			FJVariableDef t defs 		-> showFJType t <> text " " <> showDefs defs <> text ";"
+			FJVariableDef t defs 		-> showFJType t <> text " " <> showDefs defs
 ;
 
 
-data FJFieldDef = FJFieldDef FJType FJIdentifier Maybe[FJExpr]
+data FJFieldDef = FJFieldDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
 ;
 
+let showFJFieldDef (fd : FJFieldDef) : Doc =
+	case fd of
+			FJFieldDef t defs 			-> showFJType t <> text " " <> showDefs defs
+;
+
+data FJStmt = FJStmtVariableDef FJVariableDef
+            | FJStmtExpr FJExpr
+            | FJStmtBlock PList[FJStmt]
+            | FJStmtReturn FJExpr
+;
+
+let rec showFJStmt (stmt : FJStmt) : Doc =
+	case stmt of
+			FJStmtVariableDef vd 		-> showFJVariableDef vd <> text ";"
+		|	FJStmtExpr expr 			-> showFJExpr expr <> text ";"
+		|	FJStmtBlock	stmts 			-> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}"
+		| 	FJStmtReturn expr 			-> text "return " <> showFJExpr expr <> text ";"
+and showFJStmts (stmts : PList[FJStmt]) : Doc =
+	case stmts of
+			Nil 						-> NIL
+		| 	Cons x xs 					-> 
+			{
+				case xs of 
+					Nil 				-> showFJStmt x
+				|	Cons y ys 			-> showFJStmt x <> line <> showFJStmts (y +> ys)
+			}
+;
+
+--                                       int    a            = 1
+data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
+;
+
+data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
+              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
+;
+
+let rec showFJMethodParamDef (mpd : FJMethodParamDef) : Doc =
+	case mpd of
+			FJMethodParamDef t i m 		-> 
+			{
+				case m of 
+					Nothing				-> showFJType t <> text " " <> text i
+				| 	Just x 				-> showFJType t <> text " " <> text i <> text " = " <> showFJExpr x
+			}
+and
+showFJMethodParamDefs (mpds : PList[FJMethodParamDef]) : Doc =
+	case mpds of
+			Nil 						-> NIL
+		|	Cons x xs 					->
+			{
+				case xs of 
+					Nil 				-> showFJMethodParamDef x 
+				| 	Cons y ys 			-> showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (y +> ys)
+			}
+;
+
+let showFJMethod (m : FJMethod) : Doc =
+	case m of 
+			FJConstructor name params stmts 		-> group (text name <> text "(" <> showFJMethodParamDefs params <> text ") " <> line <> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}")
+		| 	FJNormalMethod name params rtype stmts  -> group (showFJType rtype <> text " " <> text name <> text "(" <> showFJMethodParamDefs params <> text ") " <> line <> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}")
+;
+
+
+data rec FJClassBodyContent = FJClassMethod FJMethod
+                            | FJClassField FJFieldDef
+                            | FJInnerClass FJClass
+and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
+;
+ 
+let rec showFJClassBodyContent (fbc : FJClassBodyContent) : Doc =
+	case fbc of 
+			FJClassMethod m 			-> showFJMethod m
+		|	FJClassField f 				-> showFJFieldDef f <> text ";"
+		| 	FJInnerClass c 				-> showFJClass c
+and
+showFJClassBodyContents (fbcs : PList[FJClassBodyContent]) : Doc =
+	case fbcs of
+			Nil 						-> NIL
+		|	Cons x xs 					->
+			{
+				case xs of 
+					Nil 				-> showFJClassBodyContent x 
+				| 	Cons y ys 			-> showFJClassBodyContent x <> line <> showFJClassBodyContents (y +> ys)
+			}
+
+and
+showFJClass (class : FJClass) : Doc =
+	case class of 
+			FJClass t mt bodys 			->
+			{
+				case mt of 
+					Nothing				-> group (text "Class " <> showFJType t <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
+				|	Just x 				-> group (text "Class " <> showFJType t <> text " extends " <> showFJType x <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
+			}
+;

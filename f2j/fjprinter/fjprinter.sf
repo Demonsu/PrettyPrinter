@@ -205,9 +205,103 @@ let showFJVariableDef (vd : FJVariableDef) : Doc =
 ;
 
 
-data FJFieldDef = FJFieldDef FJType FJIdentifier Maybe[FJExpr]
+data FJFieldDef = FJFieldDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
 ;
 
+let showFJFieldDef (fd : FJFieldDef) : Doc =
+	case fd of
+			FJFieldDef t defs 			-> showFJType t <> text " " <> showDefs defs
+;
+
+data FJStmt = FJStmtVariableDef FJVariableDef
+            | FJStmtExpr FJExpr
+            | FJStmtBlock PList[FJStmt]
+            | FJStmtReturn FJExpr
+;
+
+let rec showFJStmt (stmt : FJStmt) : Doc =
+	case stmt of
+			FJStmtVariableDef vd 		-> showFJVariableDef vd <> text ";"
+		|	FJStmtExpr expr 			-> showFJExpr expr <> text ";"
+		|	FJStmtBlock	stmts 			-> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}"
+		| 	FJStmtReturn expr 			-> text "return " <> showFJExpr expr <> text ";"
+and showFJStmts (stmts : PList[FJStmt]) : Doc =
+	case stmts of
+			Nil 						-> NIL
+		| 	Cons x xs 					-> 
+			{
+				case xs of 
+					Nil 				-> showFJStmt x
+				|	Cons y ys 			-> showFJStmt x <> line <> showFJStmts (y +> ys)
+			}
+;
+
+data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
+;
+
+data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
+              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
+;
+
+let rec showFJMethodParamDef (mpd : FJMethodParamDef) : Doc =
+	case mpd of
+			FJMethodParamDef t i m 		-> 
+			{
+				case m of 
+					Nothing				-> showFJType t <> text " " <> text i
+				| 	Just x 				-> showFJType t <> text " " <> text i <> text " = " <> showFJExpr x
+			}
+and
+showFJMethodParamDefs (mpds : PList[FJMethodParamDef]) : Doc =
+	case mpds of
+			Nil 						-> NIL
+		|	Cons x xs 					->
+			{
+				case xs of 
+					Nil 				-> showFJMethodParamDef x 
+				| 	Cons y ys 			-> showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (y +> ys)
+			}
+;
+
+let showFJMethod (m : FJMethod) : Doc =
+	case m of 
+			FJConstructor name params stmts 		-> group (text name <> text "(" <> showFJMethodParamDefs params <> text ") " <> line <> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}")
+		| 	FJNormalMethod name params rtype stmts  -> group (showFJType rtype <> text " " <> text name <> text "(" <> showFJMethodParamDefs params <> text ") " <> line <> text "{" <> nest 2 (line <> showFJStmts stmts) <> line <> text "}")
+;
+
+
+data rec FJClassBodyContent = FJClassMethod FJMethod
+                            | FJClassField FJFieldDef
+                            | FJInnerClass FJClass
+and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
+;
+ 
+let rec showFJClassBodyContent (fbc : FJClassBodyContent) : Doc =
+	case fbc of 
+			FJClassMethod m 			-> showFJMethod m
+		|	FJClassField f 				-> showFJFieldDef f <> text ";"
+		| 	FJInnerClass c 				-> showFJClass c
+and
+showFJClassBodyContents (fbcs : PList[FJClassBodyContent]) : Doc =
+	case fbcs of
+			Nil 						-> NIL
+		|	Cons x xs 					->
+			{
+				case xs of 
+					Nil 				-> showFJClassBodyContent x 
+				| 	Cons y ys 			-> showFJClassBodyContent x <> line <> showFJClassBodyContents (y +> ys)
+			}
+
+and
+showFJClass (class : FJClass) : Doc =
+	case class of 
+			FJClass t mt bodys 			->
+			{
+				case mt of 
+					Nothing				-> group (text "Class " <> showFJType t <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
+				|	Just x 				-> group (text "Class " <> showFJType t <> text " extends " <> showFJType x <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
+			}
+;
 let println (s : String) : Unit = { java.lang.System.out.println(s); () }
 ;
 let print (s : String) : Unit = { java.lang.System.out.print(s); () }
@@ -243,16 +337,6 @@ let fjexpr2 = FJFieldAccess fjexpr "b"
 ;
 let fjexpr3 = FJMethodInvoke fjexpr "f" (Cons[FJExpr] fjexpr (Cons[FJExpr] fjexpr2 (Nil[FJExpr])))
 ;
-let v = ("a", Just[FJExpr] (FJIntLiteral "10"))
-;
-let v2 = ("b", Just[FJExpr] (FJIntLiteral "20"))
-;
-let v3 = ("a", Nothing[FJExpr])
-;
-let vdef = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
-;
-let vdef2 = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v3 (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
-;
 let testFJExpr : TestFn = {
     name = "FJExpr",
     fn   = \(x : Unit) -> {
@@ -274,6 +358,19 @@ let testFJExpr3 : TestFn = {
     }
 }
 ;
+
+let v = ("a", Just[FJExpr] (FJIntLiteral "10"))
+;
+let v2 = ("b", Just[FJExpr] (FJIntLiteral "20"))
+;
+let v3 = ("a", Nothing[FJExpr])
+;
+let vdef = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let vdef2 = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v3 (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let fdef = FJFieldDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
 let testFJFJVariableDef : TestFn = {
     name = "FJVariableDef",
     fn   = \(x : Unit) -> {
@@ -289,11 +386,94 @@ let testFJFJVariableDef2 : TestFn = {
 }
 ;
 
-let tests=	(testFJFJVariableDef2				+>[TestFn]
+{-
+data FJStmt = FJStmtVariableDef FJVariableDef
+            | FJStmtExpr FJExpr
+            | FJStmtBlock PList[FJStmt]
+            | FJStmtReturn FJExpr
+;
+-}
+let stmt = FJStmtVariableDef vdef
+;
+let stmt2 = FJStmtExpr fjexpr2
+;
+let stmt3 = FJStmtReturn fjexpr3
+;
+let stmts = Cons[FJStmt] stmt (Cons[FJStmt] stmt3 (Nil[FJStmt]))
+;
+let stmt4 = FJStmtBlock (Cons[FJStmt] stmt (Cons[FJStmt] stmt2 (Cons[FJStmt] stmt3 (Nil[FJStmt]))))
+;
+let testFJStmt : TestFn = {
+    name = "FJStmt",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJStmt stmt4))
+    }
+}
+;
+
+{-
+data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
+;
+data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
+              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
+;
+-}
+let param = FJMethodParamDef (FJType "int") "a" (Nothing[FJExpr])
+;
+let param2 = FJMethodParamDef (FJType "int") "b" (Just[FJExpr] (FJIntLiteral "1"))
+;
+let method = FJConstructor "A" (Cons[FJMethodParamDef] param (Cons[FJMethodParamDef] param2 (Nil[FJMethodParamDef]))) (Nil[FJStmt])
+;
+let method2 = FJNormalMethod "B" (Cons[FJMethodParamDef] param (Cons[FJMethodParamDef] param2 (Nil[FJMethodParamDef]))) (FJType "string") stmts
+;
+let testFJMethod : TestFn = {
+    name = "FJMethod",
+    fn   = \(x : Unit) -> {
+        println (pretty 200 (showFJMethod method))
+    }
+}
+;
+let testFJMethod2 : TestFn = {
+    name = "FJMethod",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJMethod method2))
+    }
+}
+;
+{-
+data rec FJClassBodyContent = FJClassMethod FJMethod
+                            | FJClassField FJFieldDef
+                            | FJInnerClass FJClass
+and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
+;
+-}
+let cbc = FJClassMethod method2
+;
+let cbc2 = FJClassField fdef
+;
+let cbc3 = FJClassMethod method
+;
+let innerclass = FJClass (FJType "C") (Nothing[FJType]) (Cons[FJClassBodyContent] cbc2 (Cons[FJClassBodyContent] cbc3 (Cons[FJClassBodyContent] cbc (Nil[FJClassBodyContent]))))
+;
+let class = FJClass (FJType "A") (Just[FJType] (FJType "B")) (Cons[FJClassBodyContent] (FJInnerClass innerclass) (Cons[FJClassBodyContent] cbc2 (Cons[FJClassBodyContent] cbc3 (Cons[FJClassBodyContent] cbc (Nil[FJClassBodyContent])))))
+;
+let testFJClass : TestFn = {
+    name = "FJClass",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJClass class))
+    }
+}
+;
+
+let tests=	(testFJClass						+>[TestFn]
+			(testFJMethod2						+>[TestFn]
+			(testFJMethod						+>[TestFn]
+			(testFJStmt							+>[TestFn]
+			(testFJFJVariableDef2				+>[TestFn]
 			(testFJFJVariableDef				+>[TestFn]
 			(testFJExpr3						+>[TestFn]
 			(testFJExpr2						+>[TestFn]
 			(testFJExpr 						+>[TestFn] 
-			(Nil[TestFn]))))))
+			(Nil[TestFn]))))))))))
 ;
 runTests tests
