@@ -68,7 +68,7 @@ data F2JType = F2JNormalType    String PList[F2JType]
 ;
 
 
-let lengF2JType (ftype: F2JType): Int =
+let lengF2JType (ftype: F2JType): Int=
 	case ftype of
 			F2JNormalType name types -> name.length()
 		|	F2JPairedType types		 -> 4

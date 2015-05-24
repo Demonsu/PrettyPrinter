@@ -2,12 +2,12 @@
 include Makefile.inc
 
 .PHONY: all
-all: parser
+all: printer
 
-parser: parser.sf
+printer: xmlprinter.sf
 	$(F2J) -c $< $(F2JFLAGS)
 
-test: parser.sf
+test: xmlprinter.sf
 	$(F2J) -r $< $(F2JFLAGS)
 
 clean:

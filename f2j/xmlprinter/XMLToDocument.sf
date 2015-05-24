@@ -1,63 +1,8 @@
--- naive pretty printer library
+{-#
+    INCLUDE "PrettyPrintingLib2.sf"
+    INCLUDE "PList.sf"
+#-}
 
-data Doc = NIL
-		|  TEXT String Doc
-		|  LINE Int Doc
-;
-
-let nil = NIL
-;
-
-let rec (<>) (x: Doc) (y: Doc) : Doc=
-	case x of
-			TEXT s d 	-> TEXT s (d <> y)
-		|	LINE i e	-> LINE i (e <> y)		
-		|	NIL 		-> y
-;
-
-let rec nest (i: Int) (x: Doc): Doc=
-	case x of
-			TEXT s d 	-> TEXT s (nest i d)
-		|	LINE j c 	-> LINE (i+j) (nest i c)
-		|	NIL 		-> NIL
-;
-
-let text (s: String): Doc=
-	TEXT s NIL
-;
-
-let line: Doc= 
-	LINE 0 NIL
-;
-
-let concat (x : String) (y : String): String= 
-	x.concat(y)
-;
-
-let rec space (i: Int): String=
-	if i==0 then
-				""
-			 else
-			 	" ".concat(space (i-1))
-;
-
-let rec showDoc(doc: Doc): String=
-	case doc of
-			TEXT s x	-> concat s (showDoc x)
-		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
-		| 	NIL			-> ""
-;
-
-
--- Naive XML definition (from elton)
-
-data PList[A] = Nil
-              | Cons A (PList[A])
-;
-
-let (+>)[A] (a: A)(l: PList[A]): PList[A]=
-	Cons[A] a l
-;
 
 data XMLNode = XMLText      String
              | XMLAttr      String String

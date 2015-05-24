@@ -1,0 +1,98 @@
+-- naive pretty printer library
+
+data Doc = Nil
+		|  TEXT String Doc
+		|  LINE Int Doc
+;
+
+let nil=Nil
+;
+
+let rec (<>) (x: Doc) (y: Doc) : Doc=
+	case x of
+			TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	Nil 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc=
+	case x of
+			TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	Nil 		-> Nil
+;
+
+let text (s: String): Doc=
+	TEXT s Nil
+;
+
+let line: Doc= LINE 0 Nil
+;
+
+-- document to string
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	Nil			-> ""
+;
+
+-- tree definition
+
+data PList[A] = Nill
+              | Cons A (PList[A])
+;
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+data BTree = Node String PList[BTree];
+
+-- tree to document
+
+let rec showTree (tree: BTree): Doc=
+	case tree of
+			Node x xs	-> (text x) <> (showBracket xs)
+and
+showBracket (tree: PList[BTree]): Doc=
+	case tree of
+			Nill 		-> nil
+		|	Cons x xs	-> (text "[") <> (nest 2 ((line) <> (showTrees (x +>[BTree] xs))))
+							<> (line) <> (text "]")
+and
+showTrees (tree: PList[BTree]): Doc=
+	case tree of
+			Nill 		-> nil
+		|	Cons x xs	-> 
+		{
+			case xs of
+				Nill		-> (showTree x)
+			|	Cons y ys	-> (showTree x) <> (text ",") <> (line) <> (showTrees (y +>[BTree] ys))
+		}
+
+;
+
+
+let tree = Node "aaa" 
+	(Cons[BTree] 
+		(Node "bbbbb" (Nill[BTree])) 
+		(Cons[BTree] (Node "eee" (Nill[BTree])) (Cons[BTree] (Node "ffff" (Nill[BTree])) (Nill[BTree]))))
+;
+let tree2 = Node "aaa"
+	(Cons[BTree] (Node "bbb" (Cons[BTree] (Node "ee" (Nill[BTree])) (Cons[BTree] (Node "ff" (Nill[BTree])) (Nill[BTree]) ))) (Cons[BTree] (Node "cc" (Nill[BTree])) (Cons[BTree] (Node "dd" (Nill[BTree])) (Nill[BTree]))))
+;
+let tree3 = Node "aaa"
+	(Cons[BTree] (Node "bbb" (Nill[BTree])) (Nill[BTree]))
+;
+showDoc(showTree tree)

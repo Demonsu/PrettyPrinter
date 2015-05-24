@@ -1,9 +1,15 @@
-
 {-#
-    INCLUDE "PrettyPrintingLib.sf"
+    INCLUDE "PrettyPrintingLib2.sf"
     INCLUDE "PList.sf"
 #-}
--- tree definition
+
+-- utility functions
+
+let bracket (l: String) (d: Doc) (r: String): Doc =
+	group (text l <> (nest 2 (line <> d)) <> line <> text r)
+
+;
+
 data BTree = Node String PList[BTree];
 
 -- tree to document
@@ -15,8 +21,7 @@ and
 showBracket (tree: PList[BTree]): Doc=
 	case tree of
 			Nil 		-> nil
-		|	Cons x xs	-> (text "[") <> (nest 2 ((line) <> (showTrees (x +>[BTree] xs))))
-							<> (line) <> (text "]")
+		|	Cons x xs	-> bracket "[" (showTrees (x +>[BTree] xs)) "]"
 and
 showTrees (tree: PList[BTree]): Doc=
 	case tree of
@@ -42,4 +47,6 @@ let tree2 = Node "aaa"
 let tree3 = Node "aaa"
 	(Cons[BTree] (Node "bbb" (Nil[BTree])) (Nil[BTree]))
 ;
-showDoc(showTree tree)
+
+pretty 20 (showTree tree2)
+--showDoc(showTree tree)
