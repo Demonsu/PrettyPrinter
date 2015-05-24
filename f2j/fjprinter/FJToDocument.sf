@@ -1,0 +1,107 @@
+{-#
+    INCLUDE "PrettyPrintingLib2.sf"
+    INCLUDE "PList.sf"
+#-}
+
+{-
+Syntax:
+L ::= class C extends C { C f; K M }
+K ::= C(C f) { super(f); this.f=f; }
+M ::= C m(C x) { return e; }
+e ::= x | e.f | e.m(e) | new C(e) | (C)e
+-}
+
+-- Show definition
+type Show[A] = A -> Doc;
+
+-- Maybe definition
+data Maybe[A] = Nothing
+              | Just A
+;
+
+-- Maybe to Document
+let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
+	case mb of
+			Nothing		-> NIL
+		|	Just x 		-> show x
+;
+
+data FJComment = FJLineComment String
+               | FJBlockComment String
+;
+
+let rec showFJComment (cm : FJComment) : Doc =
+    case cm of
+        FJLineComment c     -> text "//" <> text c
+     |  FJBlockComment c    -> text "/*" <> line <> text c <> line <> text "*/"
+;
+
+data FJType = FJType String
+;
+
+let showFJType (f : FJType) : Doc =
+	case f of
+		FJType s 		-> text s
+;
+
+type FJIdentifier = String
+;
+
+data FJExpr = FJVariable FJIdentifier
+            | FJFieldAccess FJExpr FJIdentifier
+            | FJMethodInvoke FJExpr FJIdentifier PList[FJExpr]
+            | FJSelfMethodInvoke FJIdentifier PList[FJExpr]
+            | FJAllocate FJType PList[FJExpr]
+            | FJTypeCast FJType FJExpr
+            | FJIntLiteral String
+;
+
+let rec showFJExpr (fjexpr : FJExpr) : Doc =
+	case fjexpr of
+			FJVariable i 				-> text i
+		| 	FJFieldAccess expr i 		-> showFJExpr expr <> text "." <> text i
+		| 	FJMethodInvoke expr i exprs -> showFJExpr expr <> text "." <> text i <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		| 	FJSelfMethodInvoke i exprs 	-> text i <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		| 	FJAllocate	t exprs 		-> text "new " <> showFJType t <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		|	FJTypeCast t expr 			-> text "(" <> showFJType t <> text ")" <> showFJExpr expr
+		| 	FJIntLiteral s 				-> text s
+and showFJExprs (fjexprs : PList[FJExpr]) (decollator: String) : Doc =
+	case fjexprs of
+			Nil							-> NIL 
+		| 	Cons x xs					->
+			{
+				case xs of 
+					Nil 				-> showFJExpr x
+				|	Cons y ys 			-> showFJExpr x <> text decollator <> text " " <> (showFJExprs (y +> ys) decollator)
+			}
+;
+
+-- int a, b = 1;
+data FJVariableDef = FJVariableDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+
+let rec showDef (d : (FJIdentifier, Maybe[FJExpr])) : Doc =
+	case d._2 of
+			Nothing						-> text d._1
+		|	Just x 						-> text d._1 <> text " = " <> showFJExpr x
+and
+showDefs (defs : PList[(FJIdentifier, Maybe[FJExpr])]) : Doc =
+	case defs of
+			Nil 						-> NIL
+		|	Cons x xs 					-> 
+			{
+				case xs of 
+					Nil 				-> showDef x
+				| 	Cons y ys 			-> showDef x <> text ", " <> showDefs (y +> ys)
+			}
+;
+
+let showFJVariableDef (vd : FJVariableDef) : Doc =
+	case vd of
+			FJVariableDef t defs 		-> showFJType t <> text " " <> showDefs defs <> text ";"
+;
+
+
+data FJFieldDef = FJFieldDef FJType FJIdentifier Maybe[FJExpr]
+;
+

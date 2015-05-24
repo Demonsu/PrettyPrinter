@@ -1,0 +1,299 @@
+
+data Doc =	NIL
+        |	TEXT String Doc
+		|	LINE Int Doc
+		|	UNION Doc Doc
+;
+
+let nil = NIL
+;
+
+let (<|>) (x: Doc) (y: Doc) : Doc =
+	UNION x y
+;
+
+
+let text (s: String): Doc =
+	TEXT s NIL
+;
+
+let line: Doc = 
+	LINE 0 NIL
+;
+
+let rec (<>) (x: Doc) (y: Doc) : Doc =
+	case x of
+			UNION a b	-> (a <> y) <|> (b <> y)
+		|	TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	NIL 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc =
+	case x of
+			UNION a b	-> (nest i a) <|> (nest i b)
+		|	TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	NIL 		-> NIL
+;
+
+
+let rec flatten (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> TEXT " " (flatten x)
+		|	TEXT s x		-> TEXT s (flatten x)
+		|	UNION x y		-> flatten x
+;
+
+
+let rec group (d: Doc): Doc =
+	flatten d <|> d
+;
+
+
+let rec fits (w: Int) (d: Doc): Bool=
+	if w < 0 then False
+	else 
+		case d of
+				NIL 			-> True
+			|	TEXT s x 		-> fits (w - s.length()) x
+			|	LINE i x 		-> True
+			|	UNION _  _		-> False
+;
+
+
+let better (w: Int) (k: Int) (x: Doc) (y: Doc): Doc =
+	if fits (w - k) x then x
+	else  y
+;
+
+
+let rec best (w: Int) (k: Int) (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> LINE i (best w k x)
+		|	TEXT s x 		-> TEXT s (best w (k + s.length()) x)
+		|	UNION x y 		-> better w k (best w k x) (best w k y)
+;
+
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	NIL			-> ""
+		|	UNION x y 	-> "IMPOSSIBLE"
+;
+
+let pretty (w: Int) (d: Doc): String =
+	showDoc (best w 0 d)
+;
+
+
+data PList[A] = Nil
+              | Cons A (PList[A])
+;
+
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+
+{-
+Syntax:
+L ::= class C extends C { C f; K M }
+K ::= C(C f) { super(f); this.f=f; }
+M ::= C m(C x) { return e; }
+e ::= x | e.f | e.m(e) | new C(e) | (C)e
+-}
+
+type Show[A] = A -> Doc;
+
+data Maybe[A] = Nothing
+              | Just A
+;
+
+let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
+	case mb of
+			Nothing		-> NIL
+		|	Just x 		-> show x
+;
+
+data FJComment = FJLineComment String
+               | FJBlockComment String
+;
+
+let rec showFJComment (cm : FJComment) : Doc =
+    case cm of
+        FJLineComment c     -> text "//" <> text c
+     |  FJBlockComment c    -> text "/*" <> line <> text c <> line <> text "*/"
+;
+
+data FJType = FJType String
+;
+
+let showFJType (f : FJType) : Doc =
+	case f of
+		FJType s 		-> text s
+;
+
+type FJIdentifier = String
+;
+
+data FJExpr = FJVariable FJIdentifier
+            | FJFieldAccess FJExpr FJIdentifier
+            | FJMethodInvoke FJExpr FJIdentifier PList[FJExpr]
+            | FJSelfMethodInvoke FJIdentifier PList[FJExpr]
+            | FJAllocate FJType PList[FJExpr]
+            | FJTypeCast FJType FJExpr
+            | FJIntLiteral String
+;
+
+let rec showFJExpr (fjexpr : FJExpr) : Doc =
+	case fjexpr of
+			FJVariable i 				-> text i
+		| 	FJFieldAccess expr i 		-> showFJExpr expr <> text "." <> text i
+		| 	FJMethodInvoke expr i exprs -> showFJExpr expr <> text "." <> text i <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		| 	FJSelfMethodInvoke i exprs 	-> text i <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		| 	FJAllocate	t exprs 		-> text "new " <> showFJType t <> text "(" <> (showFJExprs exprs ",") <> text ")"
+		|	FJTypeCast t expr 			-> text "(" <> showFJType t <> text ")" <> showFJExpr expr
+		| 	FJIntLiteral s 				-> text s
+and showFJExprs (fjexprs : PList[FJExpr]) (decollator: String) : Doc =
+	case fjexprs of
+			Nil							-> NIL 
+		| 	Cons x xs					->
+			{
+				case xs of 
+					Nil 				-> showFJExpr x
+				|	Cons y ys 			-> showFJExpr x <> text decollator <> text " " <> (showFJExprs (y +> ys) decollator)
+			}
+;
+
+data FJVariableDef = FJVariableDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+
+let rec showDef (d : (FJIdentifier, Maybe[FJExpr])) : Doc =
+	case d._2 of
+			Nothing						-> text d._1
+		|	Just x 						-> text d._1 <> text " = " <> showFJExpr x
+and
+showDefs (defs : PList[(FJIdentifier, Maybe[FJExpr])]) : Doc =
+	case defs of
+			Nil 						-> NIL
+		|	Cons x xs 					-> 
+			{
+				case xs of 
+					Nil 				-> showDef x
+				| 	Cons y ys 			-> showDef x <> text ", " <> showDefs (y +> ys)
+			}
+;
+
+let showFJVariableDef (vd : FJVariableDef) : Doc =
+	case vd of
+			FJVariableDef t defs 		-> showFJType t <> text " " <> showDefs defs
+;
+
+
+data FJFieldDef = FJFieldDef FJType FJIdentifier Maybe[FJExpr]
+;
+
+let println (s : String) : Unit = { java.lang.System.out.println(s); () }
+;
+let print (s : String) : Unit = { java.lang.System.out.print(s); () }
+;
+type TestFn = {
+    name : String,
+    fn   : Unit -> Unit
+}
+;
+let fool (x: Unit) (y: Unit): Unit= {
+	()
+}
+;
+let rec runTest (test : TestFn) : Unit = {
+    let testingPrefix : String = "\u001b[31;1mtesting\u001b[0m\t";
+    println testingPrefix.concat(test.name).concat(" :");
+    test.fn ();
+    println "...check it yourself"
+}
+and 
+runTests (tests: PList[TestFn]): Unit= {
+	case tests of 
+			Nil 			-> ()
+		|	Cons x xs		-> fool (runTest x) (runTests xs) 
+}
+;
+
+
+
+let fjexpr = FJVariable "a"
+;
+let fjexpr2 = FJFieldAccess fjexpr "b"
+;
+let fjexpr3 = FJMethodInvoke fjexpr "f" (Cons[FJExpr] fjexpr (Cons[FJExpr] fjexpr2 (Nil[FJExpr])))
+;
+let v = ("a", Just[FJExpr] (FJIntLiteral "10"))
+;
+let v2 = ("b", Just[FJExpr] (FJIntLiteral "20"))
+;
+let v3 = ("a", Nothing[FJExpr])
+;
+let vdef = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let vdef2 = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v3 (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let testFJExpr : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr))
+    }
+}
+;
+let testFJExpr2 : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr2))
+    }
+}
+;
+let testFJExpr3 : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr3))
+    }
+}
+;
+let testFJFJVariableDef : TestFn = {
+    name = "FJVariableDef",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJVariableDef vdef))
+    }
+}
+;
+let testFJFJVariableDef2 : TestFn = {
+    name = "FJVariableDef",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJVariableDef vdef2))
+    }
+}
+;
+
+let tests=	(testFJFJVariableDef2				+>[TestFn]
+			(testFJFJVariableDef				+>[TestFn]
+			(testFJExpr3						+>[TestFn]
+			(testFJExpr2						+>[TestFn]
+			(testFJExpr 						+>[TestFn] 
+			(Nil[TestFn]))))))
+;
+runTests tests

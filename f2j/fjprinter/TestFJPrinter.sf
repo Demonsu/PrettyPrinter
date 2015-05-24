@@ -1,0 +1,67 @@
+{-#
+    INCLUDE "FJToDocument.sf"
+    INCLUDE "TestLib.sf"
+#-}
+
+
+
+let fjexpr = FJVariable "a"
+;
+let fjexpr2 = FJFieldAccess fjexpr "b"
+;
+let fjexpr3 = FJMethodInvoke fjexpr "f" (Cons[FJExpr] fjexpr (Cons[FJExpr] fjexpr2 (Nil[FJExpr])))
+;
+let v = ("a", Just[FJExpr] (FJIntLiteral "10"))
+;
+let v2 = ("b", Just[FJExpr] (FJIntLiteral "20"))
+;
+let v3 = ("a", Nothing[FJExpr])
+;
+let vdef = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let vdef2 = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v3 (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+;
+let testFJExpr : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr))
+    }
+}
+;
+let testFJExpr2 : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr2))
+    }
+}
+;
+let testFJExpr3 : TestFn = {
+    name = "FJExpr",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJExpr fjexpr3))
+    }
+}
+;
+let testFJFJVariableDef : TestFn = {
+    name = "FJVariableDef",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJVariableDef vdef))
+    }
+}
+;
+let testFJFJVariableDef2 : TestFn = {
+    name = "FJVariableDef",
+    fn   = \(x : Unit) -> {
+        println (pretty 20 (showFJVariableDef vdef2))
+    }
+}
+;
+
+let tests=	(testFJFJVariableDef2				+>[TestFn]
+			(testFJFJVariableDef				+>[TestFn]
+			(testFJExpr3						+>[TestFn]
+			(testFJExpr2						+>[TestFn]
+			(testFJExpr 						+>[TestFn] 
+			(Nil[TestFn]))))))
+;
+runTests tests
