@@ -1,3 +1,131 @@
+type Thunk[A] = Unit -> A;
+
+let invoke[A] (t : Thunk[A]) : A =
+    t ();
+
+type Show[A] = A -> String;
+
+data Maybe[A] = Nothing
+              | Just A
+              ;
+
+let maybeToString[A] (tostr : Show[A]) (m : Maybe[A]) : String =
+    case m of
+        Nothing     -> "Nothing"
+     |  Just x      -> "Just \{tostr x}";
+
+
+data PList[A] = Nil
+              | Cons A (Thunk[PList[A]])
+              ;
+
+let rec nats (beg : Int) : PList[Int] =
+    Cons[Int] beg (\(__ : Unit) -> nats (beg+1));
+
+
+let singleton[A] (x : A) : PList[A] =
+    Cons[A] x (\(__: Unit) -> (Nil[A]));
+
+let rec map[A, B] (f : A -> B) (l : PList[A]) : PList[B] =
+    case l of
+        Nil             ->      Nil[B]
+     |  Cons x xs       ->      Cons[B] (f x) (\(__ : Unit) -> (map[A, B] f (invoke[PList[A]] xs)));
+
+let rec foldl[A, B] (f : B -> A -> B) (z : B) (l : PList[A]) : B =
+    case l of
+        Nil             ->      z
+     |  Cons x xs       ->      foldl[A, B] f (f z x) (invoke[PList[A]] xs);
+
+
+let foldr[A, B] (f : A -> B -> B) (z : B) (l : PList[A]) : B =
+    let rec inner (s : PList[A]) (k : B -> B) : B =
+        case s of
+            Nil         -> k z
+         |  Cons x xs   -> inner (invoke[PList[A]] xs) (\(y : B) -> k (f x y));
+    inner l (\(x : B) -> x);
+
+
+let join[A] (l : PList[A]) (j : A) : PList[A] =
+    let rec inner[A] (l : PList[A]) (j : A) : PList[A] =
+        case l of
+            Nil         -> (Nil[A])
+         |  Cons x xs   -> (Cons[A] j (\(__ : Unit) ->
+                                (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j))));
+    case l of
+        Nil         -> (Nil[A])
+     |  Cons x xs   -> (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j));
+
+let (+>)[A] (a : A) (l : PList[A]) : PList[A] =
+    Cons[A] a (\(__ : Unit) -> l);
+
+let rec concat2[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    case a of
+        Nil         ->  b
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (concat2[A] (invoke[PList[A]] xs) b));
+
+let rec lazyconcat2[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    case a of
+        Nil         ->  (invoke[PList[A]] b)
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (lazyconcat2[A] (invoke[PList[A]] xs) b));
+
+let (++)[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    concat2[A] a b;
+
+let (+~)[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    lazyconcat2[A] a b;
+
+let rec concat[A] (l : PList[PList[A]]) : PList[A] =
+    case l of
+        Nil         ->  Nil[A]
+     |  Cons x xs   ->  x +~[A] (\(__ : Unit) -> (concat[A] (invoke[PList[PList[A]]] xs)));
+
+let rec len[A] (l : PList[A]) : Int =
+    case l of
+        Nil         ->  0
+     |  Cons _ xs   ->  1 + (len[A] (invoke[PList[A]] xs));
+
+let isempty[A] (l : PList[A]) : Bool =
+    case l of
+        Nil         -> True
+     |  Cons _ _    -> False;
+
+let first[A] (l : PList[A]) : Maybe[A] =
+    case l of
+        Nil         -> Nothing[A]
+     |  Cons x _    -> Just[A] x;
+
+let rest[A] (l : PList[A]) : Maybe[PList[A]] =
+    case l of
+        Nil         -> Nothing[PList[A]]
+     |  Cons _ xs   -> Just[PList[A]] (invoke[PList[A]] xs);
+
+let rec take[A] (n : Int) (l : PList[A]) : PList[A] =
+    if n <= 0 then
+        (Nil[A])
+    else
+        case l of
+            Nil         ->  Nil[A]
+         |  Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (take[A] (n-1) (invoke[PList[A]] xs)));
+
+let rec zip[A, B] (a : PList[A]) (b : PList[B]) : PList[(A, B)] =
+    case a of
+        Nil         -> Nil[(A, B)]
+     |  Cons xa xsa ->
+            case b of
+                Nil         -> Nil[(A, B)]
+             |  Cons xb xsb ->
+                    Cons[(A, B)] (xa, xb) (\(__ : Unit) -> zip[A, B] (invoke[PList[A]] xsa) (invoke[PList[B]] xsb));
+
+let pListToString[A] (tostr : A -> String) (l : PList[A]) : String =
+    type StringBuilder = java.lang.StringBuilder;
+
+    let inner = foldl[String, StringBuilder]
+                    (\(b : StringBuilder) (a : String) -> b.append(a))
+                    (new java.lang.StringBuilder("["))
+                    (join[String] (map[A, String] tostr l) ", ");
+
+    inner.append("]").toString();
+
 
 data Doc =	NIL
         |	TEXT String Doc
@@ -101,23 +229,6 @@ let pretty (w: Int) (d: Doc): String =
 	showDoc (best w 0 d)
 ;
 
-
-data PList[A] = Nil
-              | Cons A (PList[A])
-;
-
-let (+>)[A] (a: A)(l: PList[A]): PList[A]=
-	Cons[A] a l
-;
-
-{-
-Syntax:
-L ::= class C extends C { C f; K M }
-K ::= C(C f) { super(f); this.f=f; }
-M ::= C m(C x) { return e; }
-e ::= x | e.f | e.m(e) | new C(e) | (C)e
--}
-
 type Show[A] = A -> Doc;
 
 data Maybe[A] = Nothing
@@ -133,21 +244,8 @@ let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
 data FJComment = FJLineComment String
                | FJBlockComment String
 ;
-
-let rec showFJComment (cm : FJComment) : Doc =
-    case cm of
-        FJLineComment c     -> text "//" <> text c
-     |  FJBlockComment c    -> text "/*" <> line <> text c <> line <> text "*/"
-;
-
 data FJType = FJType String
 ;
-
-let showFJType (f : FJType) : Doc =
-	case f of
-		FJType s 		-> text s
-;
-
 type FJIdentifier = String
 ;
 
@@ -158,7 +256,43 @@ data FJExpr = FJVariable FJIdentifier
             | FJAllocate FJType PList[FJExpr]
             | FJTypeCast FJType FJExpr
             | FJIntLiteral String
+            | FJBracketSurroundedExpr FJExpr
 ;
+data FJVariableDef = FJVariableDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+data FJFieldDef = FJFieldDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+data FJStmt = FJStmtVariableDef FJVariableDef
+            | FJStmtExpr FJExpr
+            | FJStmtBlock PList[FJStmt]
+            | FJStmtReturn FJExpr
+;
+data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
+;
+
+data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
+              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
+;
+data rec FJClassBodyContent = FJClassMethod FJMethod
+                            | FJClassField FJFieldDef
+                            | FJInnerClass FJClass
+and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
+;
+
+let rec showFJComment (cm : FJComment) : Doc =
+    case cm of
+        FJLineComment c     -> text "//" <> text c
+     |  FJBlockComment c    -> text "/*" <> line <> text c <> line <> text "*/"
+;
+
+
+
+let showFJType (f : FJType) : Doc =
+	case f of
+		FJType s 		-> text s
+;
+
+
 
 let rec showFJExpr (fjexpr : FJExpr) : Doc =
 	case fjexpr of
@@ -169,19 +303,19 @@ let rec showFJExpr (fjexpr : FJExpr) : Doc =
 		| 	FJAllocate	t exprs 		-> text "new " <> showFJType t <> text "(" <> (showFJExprs exprs ",") <> text ")"
 		|	FJTypeCast t expr 			-> text "(" <> showFJType t <> text ")" <> showFJExpr expr
 		| 	FJIntLiteral s 				-> text s
+		|	FJBracketSurroundedExpr e 	-> text "(" <> showFJExpr e <> text ")"
 and showFJExprs (fjexprs : PList[FJExpr]) (decollator: String) : Doc =
 	case fjexprs of
 			Nil							-> NIL 
 		| 	Cons x xs					->
 			{
-				case xs of 
-					Nil 				-> showFJExpr x
-				|	Cons y ys 			-> showFJExpr x <> text decollator <> text " " <> (showFJExprs (y +> ys) decollator)
+				if isempty[FJExpr] (invoke[PList[FJExpr]] xs) then 
+				showFJExpr x
+				else 
+				showFJExpr x <> text decollator <> text " " <> (showFJExprs (invoke[PList[FJExpr]] xs) decollator)
 			}
 ;
 
-data FJVariableDef = FJVariableDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
-;
 
 let rec showDef (d : (FJIdentifier, Maybe[FJExpr])) : Doc =
 	case d._2 of
@@ -193,9 +327,10 @@ showDefs (defs : PList[(FJIdentifier, Maybe[FJExpr])]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					-> 
 			{
-				case xs of 
-					Nil 				-> showDef x
-				| 	Cons y ys 			-> showDef x <> text ", " <> showDefs (y +> ys)
+				if isempty[(FJIdentifier, Maybe[FJExpr])] (invoke[PList[(FJIdentifier, Maybe[FJExpr])]] xs) then 
+				showDef x
+				else
+				showDef x <> text ", " <> showDefs (invoke[PList[(FJIdentifier, Maybe[FJExpr])]] xs)
 			}
 ;
 
@@ -205,19 +340,13 @@ let showFJVariableDef (vd : FJVariableDef) : Doc =
 ;
 
 
-data FJFieldDef = FJFieldDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
-;
 
 let showFJFieldDef (fd : FJFieldDef) : Doc =
 	case fd of
 			FJFieldDef t defs 			-> showFJType t <> text " " <> showDefs defs
 ;
 
-data FJStmt = FJStmtVariableDef FJVariableDef
-            | FJStmtExpr FJExpr
-            | FJStmtBlock PList[FJStmt]
-            | FJStmtReturn FJExpr
-;
+
 
 let rec showFJStmt (stmt : FJStmt) : Doc =
 	case stmt of
@@ -230,18 +359,14 @@ and showFJStmts (stmts : PList[FJStmt]) : Doc =
 			Nil 						-> NIL
 		| 	Cons x xs 					-> 
 			{
-				case xs of 
-					Nil 				-> showFJStmt x
-				|	Cons y ys 			-> showFJStmt x <> line <> showFJStmts (y +> ys)
+				if isempty[FJStmt] (invoke[PList[FJStmt]] xs) then 
+				showFJStmt x
+				else
+				showFJStmt x <> line <> showFJStmts (invoke[PList[FJStmt]] xs)
 			}
 ;
 
-data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
-;
 
-data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
-              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
-;
 
 let rec showFJMethodParamDef (mpd : FJMethodParamDef) : Doc =
 	case mpd of
@@ -257,9 +382,10 @@ showFJMethodParamDefs (mpds : PList[FJMethodParamDef]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					->
 			{
-				case xs of 
-					Nil 				-> showFJMethodParamDef x 
-				| 	Cons y ys 			-> showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (y +> ys)
+				if isempty[FJMethodParamDef] (invoke[PList[FJMethodParamDef]] xs) then 
+				showFJMethodParamDef x 
+				else
+				showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (invoke[PList[FJMethodParamDef]] xs)
 			}
 ;
 
@@ -270,12 +396,7 @@ let showFJMethod (m : FJMethod) : Doc =
 ;
 
 
-data rec FJClassBodyContent = FJClassMethod FJMethod
-                            | FJClassField FJFieldDef
-                            | FJInnerClass FJClass
-and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
-;
- 
+
 let rec showFJClassBodyContent (fbc : FJClassBodyContent) : Doc =
 	case fbc of 
 			FJClassMethod m 			-> showFJMethod m
@@ -287,9 +408,10 @@ showFJClassBodyContents (fbcs : PList[FJClassBodyContent]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					->
 			{
-				case xs of 
-					Nil 				-> showFJClassBodyContent x 
-				| 	Cons y ys 			-> showFJClassBodyContent x <> line <> showFJClassBodyContents (y +> ys)
+				if isempty[FJClassBodyContent] (invoke[PList[FJClassBodyContent]] xs) then 
+				showFJClassBodyContent x 
+				else
+				showFJClassBodyContent x <> line <> showFJClassBodyContents (invoke[PList[FJClassBodyContent]] xs)
 			}
 
 and
@@ -325,7 +447,7 @@ and
 runTests (tests: PList[TestFn]): Unit= {
 	case tests of 
 			Nil 			-> ()
-		|	Cons x xs		-> fool (runTest x) (runTests xs) 
+		|	Cons x xs		-> fool (runTest x) (runTests (invoke[PList[TestFn]] xs)) 
 }
 ;
 
@@ -335,7 +457,7 @@ let fjexpr = FJVariable "a"
 ;
 let fjexpr2 = FJFieldAccess fjexpr "b"
 ;
-let fjexpr3 = FJMethodInvoke fjexpr "f" (Cons[FJExpr] fjexpr (Cons[FJExpr] fjexpr2 (Nil[FJExpr])))
+let fjexpr3 = FJMethodInvoke fjexpr "f" (fjexpr +> (Cons[FJExpr] fjexpr2 (\(__ : Unit) -> (Nil[FJExpr]))))
 ;
 let testFJExpr : TestFn = {
     name = "FJExpr",
@@ -365,11 +487,11 @@ let v2 = ("b", Just[FJExpr] (FJIntLiteral "20"))
 ;
 let v3 = ("a", Nothing[FJExpr])
 ;
-let vdef = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+let vdef = FJVariableDef (FJType "int") (v +> (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (\(__ : Unit) -> Nil[(FJIdentifier, Maybe[FJExpr])])))
 ;
-let vdef2 = FJVariableDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v3 (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+let vdef2 = FJVariableDef (FJType "int") (v3 +> (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (\(__ : Unit) -> Nil[(FJIdentifier, Maybe[FJExpr])])))
 ;
-let fdef = FJFieldDef (FJType "int") (Cons[(FJIdentifier, Maybe[FJExpr])] v (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (Nil[(FJIdentifier, Maybe[FJExpr])])))
+let fdef = FJFieldDef (FJType "int") (v +> (Cons[(FJIdentifier, Maybe[FJExpr])] v2 (\(__ : Unit) -> Nil[(FJIdentifier, Maybe[FJExpr])])))
 ;
 let testFJFJVariableDef : TestFn = {
     name = "FJVariableDef",
@@ -399,9 +521,9 @@ let stmt2 = FJStmtExpr fjexpr2
 ;
 let stmt3 = FJStmtReturn fjexpr3
 ;
-let stmts = Cons[FJStmt] stmt (Cons[FJStmt] stmt3 (Nil[FJStmt]))
+let stmts = stmt +> (Cons[FJStmt] stmt3 (\(__ : Unit) -> Nil[FJStmt]))
 ;
-let stmt4 = FJStmtBlock (Cons[FJStmt] stmt (Cons[FJStmt] stmt2 (Cons[FJStmt] stmt3 (Nil[FJStmt]))))
+let stmt4 = FJStmtBlock (stmt +> (stmt2 +> (Cons[FJStmt] stmt3 (\(__ : Unit) -> Nil[FJStmt]))))
 ;
 let testFJStmt : TestFn = {
     name = "FJStmt",
@@ -418,13 +540,14 @@ data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
               | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
 ;
 -}
+
 let param = FJMethodParamDef (FJType "int") "a" (Nothing[FJExpr])
 ;
 let param2 = FJMethodParamDef (FJType "int") "b" (Just[FJExpr] (FJIntLiteral "1"))
 ;
-let method = FJConstructor "A" (Cons[FJMethodParamDef] param (Cons[FJMethodParamDef] param2 (Nil[FJMethodParamDef]))) (Nil[FJStmt])
+let method = FJConstructor "A" (param +> (Cons[FJMethodParamDef] param2 (\(__ : Unit) -> Nil[FJMethodParamDef]))) (Nil[FJStmt])
 ;
-let method2 = FJNormalMethod "B" (Cons[FJMethodParamDef] param (Cons[FJMethodParamDef] param2 (Nil[FJMethodParamDef]))) (FJType "string") stmts
+let method2 = FJNormalMethod "B" (param +> (Cons[FJMethodParamDef] param2 (\(__ : Unit) -> Nil[FJMethodParamDef]))) (FJType "string") stmts
 ;
 let testFJMethod : TestFn = {
     name = "FJMethod",
@@ -447,15 +570,16 @@ data rec FJClassBodyContent = FJClassMethod FJMethod
 and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
 ;
 -}
+
 let cbc = FJClassMethod method2
 ;
 let cbc2 = FJClassField fdef
 ;
 let cbc3 = FJClassMethod method
 ;
-let innerclass = FJClass (FJType "C") (Nothing[FJType]) (Cons[FJClassBodyContent] cbc2 (Cons[FJClassBodyContent] cbc3 (Cons[FJClassBodyContent] cbc (Nil[FJClassBodyContent]))))
+let innerclass = FJClass (FJType "C") (Nothing[FJType]) (cbc2 +> (cbc3 +> (Cons[FJClassBodyContent] cbc (\(__ : Unit) -> Nil[FJClassBodyContent]))))
 ;
-let class = FJClass (FJType "A") (Just[FJType] (FJType "B")) (Cons[FJClassBodyContent] (FJInnerClass innerclass) (Cons[FJClassBodyContent] cbc2 (Cons[FJClassBodyContent] cbc3 (Cons[FJClassBodyContent] cbc (Nil[FJClassBodyContent])))))
+let class = FJClass (FJType "A") (Just[FJType] (FJType "B")) ((FJInnerClass innerclass) +> (cbc2 +> (cbc3 +> (Cons[FJClassBodyContent] cbc (\(__ : Unit) -> Nil[FJClassBodyContent])))))
 ;
 let testFJClass : TestFn = {
     name = "FJClass",
@@ -465,13 +589,14 @@ let testFJClass : TestFn = {
 }
 ;
 
-let tests=	(testFJClass						+>[TestFn]
-			(testFJMethod2						+>[TestFn]
-			(testFJMethod						+>[TestFn]
-			(testFJStmt							+>[TestFn]
-			(testFJFJVariableDef2				+>[TestFn]
-			(testFJFJVariableDef				+>[TestFn]
-			(testFJExpr3						+>[TestFn]
+
+let tests=  (testFJClass                        +>[TestFn]
+            (testFJMethod2                      +>[TestFn]
+            (testFJMethod                       +>[TestFn]
+            (testFJStmt                         +>[TestFn]
+            (testFJFJVariableDef2               +>[TestFn]
+            (testFJFJVariableDef                +>[TestFn]	
+            (testFJExpr3						+>[TestFn]
 			(testFJExpr2						+>[TestFn]
 			(testFJExpr 						+>[TestFn] 
 			(Nil[TestFn]))))))))))

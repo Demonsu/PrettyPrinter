@@ -1,0 +1,48 @@
+{-#
+
+    INCLUDE "fj_parser.sf"
+    INCLUDE "testfx.sf"
+    INCLUDE "PrettyPrintingLib2.sf"
+    INCLUDE "FJToDocument.sf"
+#-}
+
+{
+    let dissectElton (res : ParseOutput[FJExpr]) : FJExpr =
+        case res of
+                Nil         -> FJVariable "a"
+            |   Cons x _    -> x._1
+    ;
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "a"))));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "a.b")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "a.b()")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "new A()")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "(A) a")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "42")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "(42)")));
+    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "((42))")));
+
+    println (pretty 20 (showFJVariableDef (fjVariableDef `parseString[FJVariableDef]` "int a, b = 1;")));
+    println (pretty 20 (showFJVariableDef (fjFieldDef `parseString[FJFieldDef]` "int b = 1;")));
+
+    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "int b = 1;")));
+    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "b;")));
+    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "{ int a = 1; b; }")));
+    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "fuck(you, 1);")));
+
+    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a) { }")));
+    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a = 1) { }")));
+    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "int hello(int a) { return a; }")));
+    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "Hello(int a, int b) { }")));
+
+    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A {}")));
+    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B {}")));
+    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; }")));
+    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } }")));
+    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } void kill(int you) {}}")));
+
+    println (pretty 20 (showFJClass
+             (fjParse
+                    `parseString[PList[FJClass]]`
+                "class A extends B { int a; A() { super(); } void kill(int you) { this.a; }} class B { int b = 1; }")));
+    ()
+}

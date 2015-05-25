@@ -22,6 +22,6 @@ and
 runTests (tests: PList[TestFn]): Unit= {
 	case tests of 
 			Nil 			-> ()
-		|	Cons x xs		-> fool (runTest x) (runTests xs) 
+		|	Cons x xs		-> fool (runTest x) (runTests (invoke[PList[TestFn]] xs)) 
 }
 ;
