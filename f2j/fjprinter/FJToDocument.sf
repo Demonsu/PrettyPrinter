@@ -144,4 +144,9 @@ showFJClass (class : FJClass) : Doc =
 					Nothing				-> group (text "Class " <> showFJType t <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
 				|	Just x 				-> group (text "Class " <> showFJType t <> text " extends " <> showFJType x <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
 			}
+and
+showFJClasses (classes : PList[FJClass]) : Doc =
+	case classes of 
+			Nil 		-> NIL
+		|	Cons x xs 	-> showFJClass x <> line <> showFJClasses (invoke[PList[FJClass]] xs)
 ;

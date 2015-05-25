@@ -1136,7 +1136,6 @@ let pretty (w: Int) (d: Doc): String =
 ;
 
 
-
 let rec showFJComment (cm : FJComment) : Doc =
     case cm of
         FJLineComment c     -> text "//" <> text c
@@ -1167,12 +1166,12 @@ and showFJExprs (fjexprs : PList[FJExpr]) (decollator: String) : Doc =
 			Nil							-> NIL 
 		| 	Cons x xs					->
 			{
-				case xs of 
-					Nil 				-> showFJExpr x
-				|	Cons y ys 			-> showFJExpr x <> text decollator <> text " " <> (showFJExprs (y +> ys) decollator)
+				if isempty[FJExpr] (invoke[PList[FJExpr]] xs) then 
+				showFJExpr x
+				else 
+				showFJExpr x <> text decollator <> text " " <> (showFJExprs (invoke[PList[FJExpr]] xs) decollator)
 			}
 ;
-
 
 
 let rec showDef (d : (FJIdentifier, Maybe[FJExpr])) : Doc =
@@ -1185,9 +1184,10 @@ showDefs (defs : PList[(FJIdentifier, Maybe[FJExpr])]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					-> 
 			{
-				case xs of 
-					Nil 				-> showDef x
-				| 	Cons y ys 			-> showDef x <> text ", " <> showDefs (y +> ys)
+				if isempty[(FJIdentifier, Maybe[FJExpr])] (invoke[PList[(FJIdentifier, Maybe[FJExpr])]] xs) then 
+				showDef x
+				else
+				showDef x <> text ", " <> showDefs (invoke[PList[(FJIdentifier, Maybe[FJExpr])]] xs)
 			}
 ;
 
@@ -1216,9 +1216,10 @@ and showFJStmts (stmts : PList[FJStmt]) : Doc =
 			Nil 						-> NIL
 		| 	Cons x xs 					-> 
 			{
-				case xs of 
-					Nil 				-> showFJStmt x
-				|	Cons y ys 			-> showFJStmt x <> line <> showFJStmts (y +> ys)
+				if isempty[FJStmt] (invoke[PList[FJStmt]] xs) then 
+				showFJStmt x
+				else
+				showFJStmt x <> line <> showFJStmts (invoke[PList[FJStmt]] xs)
 			}
 ;
 
@@ -1238,9 +1239,10 @@ showFJMethodParamDefs (mpds : PList[FJMethodParamDef]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					->
 			{
-				case xs of 
-					Nil 				-> showFJMethodParamDef x 
-				| 	Cons y ys 			-> showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (y +> ys)
+				if isempty[FJMethodParamDef] (invoke[PList[FJMethodParamDef]] xs) then 
+				showFJMethodParamDef x 
+				else
+				showFJMethodParamDef x <> text ", " <> showFJMethodParamDefs (invoke[PList[FJMethodParamDef]] xs)
 			}
 ;
 
@@ -1263,9 +1265,10 @@ showFJClassBodyContents (fbcs : PList[FJClassBodyContent]) : Doc =
 			Nil 						-> NIL
 		|	Cons x xs 					->
 			{
-				case xs of 
-					Nil 				-> showFJClassBodyContent x 
-				| 	Cons y ys 			-> showFJClassBodyContent x <> line <> showFJClassBodyContents (y +> ys)
+				if isempty[FJClassBodyContent] (invoke[PList[FJClassBodyContent]] xs) then 
+				showFJClassBodyContent x 
+				else
+				showFJClassBodyContent x <> line <> showFJClassBodyContents (invoke[PList[FJClassBodyContent]] xs)
 			}
 
 and
@@ -1277,45 +1280,80 @@ showFJClass (class : FJClass) : Doc =
 					Nothing				-> group (text "Class " <> showFJType t <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
 				|	Just x 				-> group (text "Class " <> showFJType t <> text " extends " <> showFJType x <> text " " <> line <> text "{" <> nest 2 (line <> showFJClassBodyContents bodys) <> line <> text "}")
 			}
+and
+showFJClasses (classes : PList[FJClass]) : Doc =
+	case classes of 
+			Nil 		-> NIL
+		|	Cons x xs 	-> showFJClass x <> line <> showFJClasses (invoke[PList[FJClass]] xs)
 ;
-
+let dissectElton (res : ParseOutput[FJExpr]) : FJExpr =
+    case res of
+            Nil         -> error[FJExpr] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJVariableDef (res : ParseOutput[FJVariableDef]) : FJVariableDef =
+    case res of
+            Nil         -> error[FJVariableDef] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJFieldDef (res : ParseOutput[FJFieldDef]) : FJFieldDef =
+    case res of
+            Nil         -> error[FJFieldDef] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJStmt (res : ParseOutput[FJStmt]) : FJStmt =
+    case res of
+            Nil         -> error[FJStmt] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJMethod (res : ParseOutput[FJMethod]) : FJMethod =
+    case res of
+            Nil         -> error[FJMethod] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJClass (res : ParseOutput[FJClass]) : FJClass =
+    case res of
+            Nil         -> error[FJClass] "It must be Elton"
+        |   Cons x _    -> x._1
+;
+let dissectFJClasses (res : ParseOutput[PList[FJClass]]) : PList[FJClass] =
+    case res of
+            Nil         -> error[PList[FJClass]] "It must be Elton"
+        |   Cons x _    -> x._1
+;
 {
-    let dissectElton (res : ParseOutput[FJExpr]) : FJExpr =
-        case res of
-                Nil         -> FJVariable "a"
-            |   Cons x _    -> x._1
-    ;
+
     println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "a"))));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "a.b")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "a.b()")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "new A()")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "(A) a")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "42")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "(42)")));
-    println (pretty 20 (showFJExpr (fjExpr `parseString[FJExpr]` "((42))")));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "a.b"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "a.b()"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "new A()"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "(A) a"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "42"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "(42)"))));
+    println (pretty 20 (showFJExpr (dissectElton (fjExpr `parseString[FJExpr]` "((42))"))));
 
-    println (pretty 20 (showFJVariableDef (fjVariableDef `parseString[FJVariableDef]` "int a, b = 1;")));
-    println (pretty 20 (showFJVariableDef (fjFieldDef `parseString[FJFieldDef]` "int b = 1;")));
+    println (pretty 20 (showFJVariableDef (dissectFJVariableDef (fjVariableDef `parseString[FJVariableDef]` "int a, b = 1;"))));
+    println (pretty 20 (showFJFieldDef (dissectFJFieldDef (fjFieldDef `parseString[FJFieldDef]` "int b = 1;"))));
 
-    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "int b = 1;")));
-    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "b;")));
-    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "{ int a = 1; b; }")));
-    println (pretty 20 (showFJStmt (fjStmt `parseString[FJStmt]` "fuck(you, 1);")));
+    println (pretty 20 (showFJStmt (dissectFJStmt (fjStmt `parseString[FJStmt]` "int b = 1;"))));
+    println (pretty 20 (showFJStmt (dissectFJStmt (fjStmt `parseString[FJStmt]` "b;"))));
+    println (pretty 20 (showFJStmt (dissectFJStmt (fjStmt `parseString[FJStmt]` "{ int a = 1; b; }"))));
+    println (pretty 20 (showFJStmt (dissectFJStmt (fjStmt `parseString[FJStmt]` "fuck(you, 1);"))));
 
-    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a) { }")));
-    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a = 1) { }")));
-    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "int hello(int a) { return a; }")));
-    println (pretty 200 (showFJMethod (fjMethod `parseString[FJMethod]` "Hello(int a, int b) { }")));
+    println (pretty 200 (showFJMethod (dissectFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a) { }"))));
+    println (pretty 200 (showFJMethod (dissectFJMethod (fjMethod `parseString[FJMethod]` "void hello(int a = 1) { }"))));
+    println (pretty 200 (showFJMethod (dissectFJMethod (fjMethod `parseString[FJMethod]` "int hello(int a) { return a; }"))));
+    println (pretty 200 (showFJMethod (dissectFJMethod (fjMethod `parseString[FJMethod]` "Hello(int a, int b) { }"))));
 
-    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A {}")));
-    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B {}")));
-    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; }")));
-    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } }")));
-    println (pretty 20 (showFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } void kill(int you) {}}")));
+    println (pretty 20 (showFJClass (dissectFJClass (fjClass `parseString[FJClass]` "class A {}"))));
+    println (pretty 20 (showFJClass (dissectFJClass (fjClass `parseString[FJClass]` "class A extends B {}"))));
+    println (pretty 20 (showFJClass (dissectFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; }"))));
+    println (pretty 20 (showFJClass (dissectFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } }"))));
+    println (pretty 20 (showFJClass (dissectFJClass (fjClass `parseString[FJClass]` "class A extends B { int a; A() { super(); } void kill(int you) {}}"))));
 
-    println (pretty 20 (showFJClass
-             (fjParse
+    println (pretty 20 (showFJClasses
+             (dissectFJClasses (fjParse
                     `parseString[PList[FJClass]]`
-                "class A extends B { int a; A() { super(); } void kill(int you) { this.a; }} class B { int b = 1; }")));
+                "class A extends B { int a; A() { super(); } void kill(int you) { this.a; }} class B { int b = 1; }"))));
     ()
 }
