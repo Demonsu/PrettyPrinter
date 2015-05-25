@@ -14,10 +14,10 @@ let rec showF2JType (ftype: F2JType): Doc=
 	case ftype of
 			F2JNormalType name params -> 
 			{
-				if isempty[F2JType] params then 
-				text name
-				else 
-				text name <> text "[" <> (showF2JTypes params ",") <> text "]"				
+				case params of
+					Nil 			  -> text name
+				|	Cons x xs		  -> text name <> text "[" <> (showF2JTypes (x +> xs) ",") <> text "]"
+				
 			}
 		|	F2JPairedType types		  -> text "(" <> (showF2JTypes types ",") <> text ")"
 		|	F2JFunctionType from to   -> showF2JType from <> text " -> " <> showF2JType to
@@ -27,10 +27,9 @@ showF2JTypes (ftypelist: PList[F2JType]) (decollator: String): Doc =
 			Nil						  -> NIL
 		|	Cons x xs				  -> 
 			{
-				if isempty[F2JType] (invoke[PList[F2JType]] xs) then
-				showF2JType x
-				else
-				showF2JType x <> (text decollator) <> (showF2JTypes (invoke[PList[F2JType]] xs) decollator)
+				case xs of
+					Nil 			  -> showF2JType x
+				|	Cons y ys 		  -> showF2JType x <> (text decollator) <> (showF2JTypes (y +> ys) decollator)
 			}
 ;
 
@@ -40,17 +39,16 @@ showF2JTypes (ftypelist: PList[F2JType]) (decollator: String): Doc =
 
 let rec showF2JBindingParam (fbindingparam: F2JBindingParam): Doc=
 	case fbindingparam of
-			F2JBindingParam name ftype ->
-				text "(" <> text name <> text ": " <> showF2JType ftype <> text ")"
+			F2JBindingParam name types ->
+				text "(" <> text name <> text ": " <> showF2JType types <> text ")"
 and showF2JBindingParams (fbindingparams: PList[F2JBindingParam]): Doc=
 	case fbindingparams of
 			Nil 					-> NIL
 		|	Cons x xs				-> 
 			{
-				if isempty[F2JBindingParam] (invoke[PList[F2JBindingParam]] xs) then
-				showF2JBindingParam x
-				else
-				showF2JBindingParam x <> text " " <> showF2JBindingParams (invoke[PList[F2JBindingParam]] xs)
+				case xs of
+					Nil 			-> showF2JBindingParam x
+				|	Cons y ys		-> showF2JBindingParam x <> text " " <> showF2JBindingParams (y +> ys)
 			}
 ;
 
@@ -66,10 +64,10 @@ and showF2JADTAlternatives (f2jadtalternatives: PList[F2JADTAlternative]) (inden
 			Nil 					-> NIL
 		|	Cons x xs				->
 			{
-				if isempty[F2JADTAlternative] (invoke[PList[F2JADTAlternative]] xs) then
-				showF2JADTAlternative x
-				else
-				showF2JADTAlternative x <> line <>	text (space indent) <> text "|" <> (showF2JADTAlternatives (invoke[PList[F2JADTAlternative]] xs) indent)
+				case xs of
+					Nil 			-> showF2JADTAlternative x
+				|	Cons y ys 		-> showF2JADTAlternative x <> 
+										line <>	text (space indent) <> text "|" <> (showF2JADTAlternatives (y +> ys) indent)
 			}
 ;
 
@@ -86,10 +84,9 @@ and showF2JADTRecordItems (f2jadtrecorditems: PList[F2JADTRecordItem]): Doc=
 			Nil 					 -> NIL
 		|	Cons x xs				 -> 
 			{
-				if isempty[F2JADTRecordItem] (invoke[PList[F2JADTRecordItem]] xs) then
-				showF2JADTRecordItem x
-				else
-				showF2JADTRecordItem x <> text "," <> line <> showF2JADTRecordItems (invoke[PList[F2JADTRecordItem]] xs)
+				case xs of
+					Nil 			 -> showF2JADTRecordItem x
+				|	Cons y ys		 -> showF2JADTRecordItem x <> text "," <> line <> showF2JADTRecordItems (y +> ys)
 			}
 ;
 
@@ -107,10 +104,9 @@ and showF2JADTBodys (f2jadtbodys: PList[F2JADTBody]) (indentation: Int): Doc=
 			Nil 				-> NIL
 		|	Cons x xs 			->
 			{
-				if isempty[F2JADTBody] (invoke[PList[F2JADTBody]] xs) then
-				showF2JADTBody x indentation
-				else
-				showF2JADTBody x indentation <> line <> text "and" <> line <> (showF2JADTBodys (invoke[PList[F2JADTBody]] xs) indentation)
+				case xs of
+					Nil 		-> showF2JADTBody x indentation
+				|	Cons y ys	-> showF2JADTBody x indentation <> line <> text "and" <> line <> (showF2JADTBodys (y +> ys) indentation )
 			}
 ;
 
@@ -126,8 +122,9 @@ let max (a: Int) (b: Int) : Int=
 -- length of string list plus spaces
 let rec lengOfPListString (strs: PList[String]): Int=
     case strs of
-        Cons x xs -> x.length() + 1 + (lengOfPListString (invoke[PList[String]] xs))
+        Cons x xs -> x.length() + 1 + lengOfPListString(xs)
     |   Nil       -> 0
+
 ;
 
 --length of F2JCaseAlternative
@@ -140,7 +137,7 @@ and
 lengOfF2JCaseAlternatives (cas: PList[F2JCaseAlternative]): Int=
     case cas of
             Nil         -> 0
-        |   Cons x xs   -> max (lengOfF2JCaseAlternative x) (lengOfF2JCaseAlternatives (invoke[PList[F2JCaseAlternative]] xs))
+        |   Cons x xs   -> max (lengOfF2JCaseAlternative x) (lengOfF2JCaseAlternatives xs)
 ;
 
 
@@ -158,13 +155,7 @@ and showF2JRecordItems (records: PList[F2JRecordItem]): Doc=
 let rec showPListString (ss: PList[String]): Doc=
 	case ss of
 			Nil 		-> NIL
-		|	Cons x xs	-> text x <> text " " <> showPListString (invoke[PList[String]] xs)
-;
-
-let showMaybe[A] (show: A -> Doc) (mb: Maybe[A]): Doc=
-	case mb of
-			Nothing 	-> NIL
-		| 	Just x 		-> show x
+		|	Cons x xs	-> text x <> text " " <> showPListString xs
 ;
 
 
@@ -172,18 +163,17 @@ let rec showF2JBindingBody (b : F2JBindingBody): Doc =
     case b of
         	F2JLetBindingBody name args params rettype expr 	->
         	{
-        		if isempty[F2JType] args then
-        		text name <> text " " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
-        		else
-        		text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
-			}
+        		case args of
+        			Nil 		-> text name <> text " " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        		|	Cons x xs	-> text name <> text "[" <> showF2JTypes (x +> xs) "," <> text "] " <> showF2JBindingParams params <> text ": " <> showMaybe[F2JType] showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+        	}
 
      	|  	F2JLetRecBindingBody name args params rettype expr 	->
      		{
-     			if isempty[F2JType] args then
-     			text name <> text " " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
-     			else
-     			text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+     			case args of 
+     				Nil 		-> text name <> text " " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+     			| 	Cons x xs   -> text name <> text "[" <> showF2JTypes args "," <> text "] " <> showF2JBindingParams params <> text ": " <> showF2JType rettype <> text " =" <> nest 4 (line <> (showF2JExpr expr))
+
      		}
      		
 
@@ -192,10 +182,9 @@ and showF2JBindingBodys (bs: PList[F2JBindingBody]): Doc=
 			Nil 						-> NIL
 		|	Cons x xs					->
 			{
-				if isempty[F2JBindingBody] (invoke[PList[F2JBindingBody]] xs) then
-				showF2JBindingBody x
-				else
-				showF2JBindingBody x <> line <> text "and" <> line <> showF2JBindingBodys (invoke[PList[F2JBindingBody]] xs)
+				case xs of
+					Nil 				-> showF2JBindingBody x
+				|	Cons y ys			-> showF2JBindingBody x <> line <> text "and" <> line <> showF2JBindingBodys (y +> ys) 
 			}
 
 
@@ -218,10 +207,9 @@ and showF2JCaseAlternatives (cas: PList[F2JCaseAlternative]) (maxLen: Int): Doc=
 			Nil 						-> NIL
 		|	Cons x xs					->
 			{
-				if isempty[F2JCaseAlternative] (invoke[PList[F2JCaseAlternative]] xs) then
-				showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen
-				else
-				(showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen) <> line <> text "|" <> (showF2JCaseAlternatives (invoke[PList[F2JCaseAlternative]] xs) maxLen)
+				case xs of
+					Nil 				-> showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen
+				|	Cons y ys 			-> (showF2JCaseAlternative x (lengOfF2JCaseAlternative x) maxLen) <> line <> text "|" <> (showF2JCaseAlternatives (y +> ys) maxLen)
 			}
 and showF2JExpr (expr: F2JExpr): Doc=
 	case expr of
@@ -254,10 +242,9 @@ and showF2JExprs (exprs: PList[F2JExpr]): Doc=
 			Nil 				-> NIL
 		|	Cons x xs			-> 
 			{
-				if isempty[F2JExpr] (invoke[PList[F2JExpr]] xs) then
-				showF2JExpr x
-				else
-				showF2JExpr x <> text " " <> showF2JExprs (invoke[PList[F2JExpr]] xs)
+				case xs of
+					Nil 		-> showF2JExpr x
+				|	Cons y ys 	-> showF2JExpr x <> text " " <> showF2JExprs (y +> ys)
 			}
 ;
 

@@ -1,4 +1,7 @@
 {-#
+	INCLUDE "plist.sf"
+	INCLUDE "PrettyPrintingLib.sf"
+    INCLUDE "f2jdef.sf"
     INCLUDE "F2JToDocument.sf"
     INCLUDE "TestLib.sf"
 #-}
@@ -10,10 +13,12 @@
 --             | F2JPairedType    PList[F2JType]
 --             | F2JFunctionType  F2JType F2JType
 --;
+let f2jnormaltype = F2JNormalType "F2JType" (Nil[F2JType])
+;
 let f2jtype = F2JFunctionType (
 								F2JPairedType (
-												Cons[F2JType] (F2JNormalType "A" (Nil[F2JType])) (
-																		Cons[F2JType] (F2JNormalType "B" (Nil[F2JType])) (Nil[F2JType])
+												(F2JNormalType "A" (Nil[F2JType]))  +> (
+																		Cons[F2JType] (F2JNormalType "B" (Nil[F2JType])) (\(__ : Unit) -> Nil[F2JType])
 																		)
 											  )
 							  ) 
@@ -22,14 +27,12 @@ let f2jtype = F2JFunctionType (
 			  				  )	  
 
 ;
-let f2jnormaltype = F2JNormalType "F2JType" (Nil[F2JType])
-;
-let f2jtypes = Cons[F2JType] 
-				(F2JNormalType "A" (Nil[F2JType])) 
+
+let f2jtypes =  (F2JNormalType "A" (Nil[F2JType])) +> 
 				(
 					Cons[F2JType] 
 					(F2JNormalType "B" (Nil[F2JType])) 
-					(Nil[F2JType])
+					(\(__ : Unit) -> Nil[F2JType])
 				)
 ;
 let testF2JType : TestFn = {
@@ -48,7 +51,7 @@ let fbingdingparam1 = F2JBindingParam "b" f2jtype
 ;
 let fbingdingparam2 = F2JBindingParam "c" f2jtype
 ;
-let fbingdingparams = Cons[F2JBindingParam] (fbingdingparam) (Cons[F2JBindingParam] (fbingdingparam1) (Cons[F2JBindingParam] (fbingdingparam2) (Nil[F2JBindingParam])))
+let fbingdingparams = fbingdingparam +> (fbingdingparam1 +> (Cons[F2JBindingParam] (fbingdingparam2) (\(__ : Unit) -> Nil[F2JBindingParam])))
 ;
 let testF2JBindingParam : TestFn = {
     name = "F2JBindingParam",
@@ -65,12 +68,11 @@ let testF2JBindingParam : TestFn = {
 let alternative1 = F2JADTAlternative 
 					"F2JNormalType" 
 					(
-						Cons[F2JType] 
-						(F2JNormalType "String" (Nil[F2JType])) 
+						(F2JNormalType "String" (Nil[F2JType])) +>
 						(
-							Cons[F2JType] 
-							(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (Nil[F2JType])))
-							(Nil[F2JType])  
+							Cons[F2JType]
+							(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (\(__ : Unit) -> Nil[F2JType])))
+							(\(__ : Unit) -> Nil[F2JType])  
 						)
 					)
 ;
@@ -78,20 +80,19 @@ let alternative2 = F2JADTAlternative
 					"F2JPairedType" 
 					(
 						Cons[F2JType] 
-						(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (Nil[F2JType])))
-						(Nil[F2JType])  
+						(F2JNormalType "PList" (Cons[F2JType] (F2JNormalType "F2JType" (Nil[F2JType])) (\(__ : Unit) -> Nil[F2JType])))
+						(\(__ : Unit) -> Nil[F2JType])  
 					)
 ;
 let alternative3 = F2JADTAlternative 
 					"F2JFunctionType" 
 					(
-						Cons[F2JType] 
-						(F2JNormalType "F2JType" (Nil[F2JType]) )
+						(F2JNormalType "F2JType" (Nil[F2JType]) ) +>
 						(
 							Cons[F2JType] 
 							(F2JNormalType "F2JType" (Nil[F2JType]) )
 							(
-								Nil[F2JType]
+								\(__ : Unit) -> Nil[F2JType]
 							)
 						)  
 					)
@@ -99,15 +100,13 @@ let alternative3 = F2JADTAlternative
 let adtbody1 = F2JADTNormalBody 
 				(F2JNormalType "F2JType" (Nil[F2JType])) 
 				(
-					Cons[F2JADTAlternative] 
-						(alternative1)
+						(alternative1) +>
 						(
-							Cons[F2JADTAlternative]
-							(alternative2)
+							(alternative2) +>
 							(
 								Cons[F2JADTAlternative]
 								(alternative3)
-								(Nil[F2JADTAlternative])
+								(\(__ : Unit) -> Nil[F2JADTAlternative])
 							)
 						)  
 				)
@@ -141,15 +140,13 @@ let recorditem3= F2JADTRecordItem "gender" (F2JNormalType "male" (Nil[F2JType]))
 let adtbody2 = F2JADTRecordBody
 				(F2JNormalType "F2JRecord" (Nil[F2JType]))
 				(
-					Cons[F2JADTRecordItem] 
-						(recorditem1)
+						(recorditem1) +>
 						(
-							Cons[F2JADTRecordItem]
-							(recorditem2)
+							(recorditem2) +>
 							(
 								Cons[F2JADTRecordItem]
 								(recorditem3)
-								(Nil[F2JADTRecordItem])
+								(\(__ : Unit) -> Nil[F2JADTRecordItem])
 							)
 						)  
 				)	
@@ -200,7 +197,7 @@ let testF2JLetBindingBodyRec : TestFn = {
 }
 ;
 --F2JRecADT             PList[F2JADTBody]        F2JExpr
-let f2jexpr_f2jadt= F2JADT (Cons[F2JADTBody] adtbody1 (Cons[F2JADTBody] adtbody2 (Nil[F2JADTBody]))) (F2JVariable "test")
+let f2jexpr_f2jadt= F2JADT (adtbody1 +> (Cons[F2JADTBody] adtbody2 (\(__ : Unit) -> Nil[F2JADTBody]))) (F2JVariable "test")
 ;
 let testF2JExprF2JADT : TestFn = {
     name = "F2JExpr(F2JADT)",
@@ -209,7 +206,7 @@ let testF2JExprF2JADT : TestFn = {
     }
 }
 ;
-let f2jexpr_f2jrecadt= F2JRecADT (Cons[F2JADTBody] adtbody1 (Cons[F2JADTBody] adtbody1 (Nil[F2JADTBody]))) (F2JVariable "test")
+let f2jexpr_f2jrecadt= F2JRecADT (adtbody1 +> (Cons[F2JADTBody] adtbody1 (\(__ : Unit) -> Nil[F2JADTBody]))) (F2JVariable "test")
 ;
 let testF2JExprF2JRecADT : TestFn = {
     name = "F2JExpr(F2JRecADT)",
@@ -225,13 +222,14 @@ let f2jexpr_app = F2JApplication (F2JVariable "text") (F2JApplicationParamExpr (
 let f2jexpr_app1 = F2JApplication (F2JVariable "<>") (
 					F2JApplicationParamExpr
 						(F2JPair
-						(Cons[F2JExpr]   
-						(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type1")))
-							(Cons[F2JExpr]
-								(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type2")))
-								(Nil[F2JExpr])
-							)
-						))
+						(  
+							(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type1"))) +>
+								(Cons[F2JExpr]
+									(F2JApplication (F2JVariable "showF2JType") (F2JApplicationParamExpr (F2JVariable "type2")))
+									(\(__ : Unit) -> Nil[F2JExpr])
+								)
+						)
+						)
 	)
 ;
 let f2jexpr_app2 = F2JApplication (F2JVariable "showF2JTypes") (F2JApplicationParamExpr (F2JVariable "types"))
@@ -239,13 +237,13 @@ let f2jexpr_app2 = F2JApplication (F2JVariable "showF2JTypes") (F2JApplicationPa
 
 --F2JCase               F2JExpr                  PList[F2JCaseAlternative]
 --F2JCaseAlternative = F2JCaseAlternative String PList[String] F2JExpr
-let casealternative1= F2JCaseAlternative "F2JNormalType" (Cons[String] "s" (Cons[String] "types" (Nil[String]))) (f2jexpr_app)
+let casealternative1= F2JCaseAlternative "F2JNormalType" ("s" +> (Cons[String] "types" (\(__ : Unit) -> Nil[String]))) (f2jexpr_app)
 ;
-let casealternative2= F2JCaseAlternative "F2JFunctionType" (Cons[String] "type1" (Cons[String] "type2" (Nil[String]))) (f2jexpr_app1)
+let casealternative2= F2JCaseAlternative "F2JFunctionType" ("type1" +> (Cons[String] "type2" (\(__ : Unit) -> Nil[String]))) (f2jexpr_app1)
 ;
-let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (Nil[String])) (f2jexpr_app2)
+let casealternative3= F2JCaseAlternative "F2JPairedType" (Cons[String] "types" (\(__ : Unit) -> Nil[String])) (f2jexpr_app2)
 ;
-let casealternatives= Cons[F2JCaseAlternative] casealternative1 (Cons[F2JCaseAlternative] casealternative2 (Cons[F2JCaseAlternative] casealternative3 (Nil[F2JCaseAlternative]) ))
+let casealternatives= casealternative1 +> (casealternative2 +> (Cons[F2JCaseAlternative] casealternative3 (\(__ : Unit) -> Nil[F2JCaseAlternative]) ))
 ;
 let f2jexpr_f2jcase= F2JCase (F2JVariable "x") casealternatives
 ;
@@ -265,10 +263,10 @@ let f2jnormaltype2 = F2JNormalType "Doc" (Nil[F2JType])
 ;
 let maybenormal1= Just[F2JType] f2jnormaltype2
 ;
-let f2jbindingbody2= F2JLetBindingBody "showF2JType" (Nil[F2JType]) (Cons[F2JBindingParam] (F2JBindingParam "x" f2jnormaltype1) (Nil[F2JBindingParam]) ) maybenormal1  f2jexpr_f2jcase
+let f2jbindingbody2= F2JLetBindingBody "showF2JType" (Nil[F2JType]) (Cons[F2JBindingParam] (F2JBindingParam "x" f2jnormaltype1) (\(__ : Unit) -> Nil[F2JBindingParam]) ) maybenormal1  f2jexpr_f2jcase
 ;
-let f2jexpr_f2jfull= F2JADT (Cons[F2JADTBody] adtbody1 (Nil[F2JADTBody])) 
-					(F2JLet (Cons[F2JBindingBody] f2jbindingbody2 (Nil[F2JBindingBody])) (F2JVariable "end"))
+let f2jexpr_f2jfull= F2JADT (Cons[F2JADTBody] adtbody1 (\(__ : Unit) -> Nil[F2JADTBody])) 
+					(F2JLet (Cons[F2JBindingBody] f2jbindingbody2 (\(__ : Unit) -> Nil[F2JBindingBody])) (F2JVariable "end"))
 ;
 let testF2JExprFull : TestFn = {
     name = "F2JExpr(Full)",
