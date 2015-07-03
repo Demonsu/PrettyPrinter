@@ -584,7 +584,7 @@ let class = FJClass (FJType "A") (Just[FJType] (FJType "B")) ((FJInnerClass inne
 let testFJClass : TestFn = {
     name = "FJClass",
     fn   = \(x : Unit) -> {
-        println (pretty 20 (showFJClass class))
+        println (pretty 150 (showFJClass class))
     }
 }
 ;

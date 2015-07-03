@@ -1,17 +1,32 @@
 {-#
 	INCLUDE "f2j_parser.sf"
+	INCLUDE "PrettyPrintingLib.sf"
     INCLUDE "F2JToDocument.sf"
     INCLUDE "TestLib.sf"
-
+	INCLUDE "test_parser_helpers.sf"
 #-}
 
-let printFirstF2JParseResult (l : ParseOutput[F2JExpr]) =
+-- let printFirstF2JParseResult (l : ParseOutput[F2JExpr]) =
+--     let result =
+--         case l of
+--             Nil             -> "Empty result!"
+--          |  Cons x _        -> showDoc (showF2JExpr (x._1))
+--     ;
+
+--     println result
+-- ;
+
+let fuckFirstF2JParseResult (l : ParseOutput[F2JExpr]) =
     let result =
         case l of
             Nil             -> "Empty result!"
-         |  Cons x _        -> showDoc (showF2JExpr (x._1))
+         |  Cons x _        -> f2jExprToString x._1
     ;
 
     println result
 ;
-printFirstF2JParseResult (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+
+{
+	fuckFirstF2JParseResult (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+	--printFirstF2JParseResult (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+}
