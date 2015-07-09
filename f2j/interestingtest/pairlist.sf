@@ -1,0 +1,46 @@
+-- complete pretty printer library
+
+data Doc =	NIL
+		|	LINE Int
+		|	TEXT String
+;
+
+-- for docpair list, seperating from lazy PList outside
+
+data DList[A] = DNil
+              | Cons A (DList[A])
+;
+
+let (+>)[A] (a: A) (l: DList[A]): DList[A] =
+	Cons[A] a l
+;
+
+-- print doc, for converting into string
+
+data PDoc = NI
+		|	TE String PDoc
+		|	LI Int PDoc
+;
+
+type Pair = (Int, Doc)
+;
+
+let rec showPL (docs: DList[Pair]): Int = 
+	case docs of 
+		DNil 		->  0
+	|	Cons x xs	->
+		{
+			case x._2 of
+				NIL    -> 0
+			|	LINE i -> x._1 + i
+			|	TEXT s -> showPL (Cons[Pair] (10,NIL) xs)
+		}
+
+;
+
+let docs =
+	Cons[Pair] (1, (TEXT "1")) (DNil[Pair])
+
+;
+
+showPL docs
