@@ -1,0 +1,17 @@
+
+# Path to f2j compiler
+F2J      = f2j
+
+# Default flags to compiler
+F2JFLAGS = -m stack --inline
+
+
+printer: fjprinter.sf
+	$(F2J) -c $< $(F2JFLAGS)
+
+test: fjprinter.sf
+	$(F2J) -r $< $(F2JFLAGS)
+
+clean:
+	rm -f *.java *.class
+

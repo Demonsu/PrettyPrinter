@@ -1,0 +1,167 @@
+
+data Doc =	NIL
+        |	TEXT String Doc
+		|	LINE Int Doc
+		|	UNION Doc Doc
+;
+
+let nil = NIL
+;
+
+let (<|>) (x: Doc) (y: Doc) : Doc =
+	UNION x y
+;
+
+
+let text (s: String): Doc =
+	TEXT s NIL
+;
+
+let line: Doc = 
+	LINE 0 NIL
+;
+
+let rec (<>) (x: Doc) (y: Doc) : Doc =
+	case x of
+			UNION a b	-> (a <> y) <|> (b <> y)
+		|	TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	NIL 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc =
+	case x of
+			UNION a b	-> (nest i a) <|> (nest i b)
+		|	TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	NIL 		-> NIL
+;
+
+
+let rec flatten (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> TEXT " " (flatten x)
+		|	TEXT s x		-> TEXT s (flatten x)
+		|	UNION x y		-> flatten x
+;
+
+
+let rec group (d: Doc): Doc =
+	flatten d <|> d
+;
+
+
+let rec fits (w: Int) (d: Doc): Bool=
+	if w < 0 then False
+	else 
+		case d of
+				NIL 			-> True
+			|	TEXT s x 		-> fits (w - s.length()) x
+			|	LINE i x 		-> True
+			|	UNION _  _		-> False
+;
+
+
+let better (w: Int) (k: Int) (x: Doc) (y: Doc): Doc =
+	if fits (w - k) x then x
+	else  y
+;
+
+
+let rec best (w: Int) (k: Int) (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> LINE i (best w k x)
+		|	TEXT s x 		-> TEXT s (best w (k + s.length()) x)
+		|	UNION x y 		-> better w k (best w k x) (best w k y)
+;
+
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	NIL			-> ""
+		|	UNION x y 	-> "IMPOSSIBLE"
+;
+
+let pretty (w: Int) (d: Doc): String =
+	showDoc (best w 0 d)
+;
+
+
+data PList[A] = Nil
+              | Cons A (PList[A])
+;
+
+let (+>)[A] (a: A)(l: PList[A]): PList[A]=
+	Cons[A] a l
+;
+
+
+let bracket (l: String) (d: Doc) (r: String): Doc =
+	group (text l <> (nest 2 (line <> d)) <> line <> text r)
+
+;
+
+data BTree = Node String PList[BTree];
+
+
+let rec showTree (tree: BTree): Doc=
+	case tree of
+			Node x xs	-> (text x) <> (showBracket xs)
+and
+showBracket (tree: PList[BTree]): Doc=
+	case tree of
+			Nil 		-> nil
+		|	Cons x xs	-> bracket "[" (showTrees (x +>[BTree] xs)) "]"
+and
+showTrees (tree: PList[BTree]): Doc=
+	case tree of
+			Nil 		-> nil
+		|	Cons x xs	-> 
+		{
+			case xs of
+				Nil		-> (showTree x)
+			|	Cons y ys	-> (showTree x) <> (text ",") <> (line) <> (showTrees (y +>[BTree] ys))
+		}
+
+;
+
+
+let tree = Node "aaa" 
+	(Cons[BTree] 
+		(Node "bbbbb" (Nil[BTree])) 
+		(Cons[BTree] (Node "eee" (Nil[BTree])) (Cons[BTree] (Node "ffff" (Nil[BTree])) (Nil[BTree]))))
+;
+let tree2 = Node "aaa"
+	(Cons[BTree] (Node "bbb" (Cons[BTree] (Node "ee" (Nil[BTree])) (Cons[BTree] (Node "ff" (Nil[BTree])) (Nil[BTree]) ))) (Cons[BTree] (Node "cc" (Nil[BTree])) (Cons[BTree] (Node "dd" (Nil[BTree])) (Nil[BTree]))))
+;
+let tree3 = Node "aaa"
+	(Cons[BTree] (Node "bbb" (Nil[BTree])) (Nil[BTree]))
+;
+{
+println "Line Width 10:";
+
+println (pretty 10 (showTree tree2));
+
+println "Line Width 20:";
+
+println (pretty 20 (showTree tree2));
+
+println "Line Width 30:";
+
+println (pretty 30 (showTree tree2))
+}

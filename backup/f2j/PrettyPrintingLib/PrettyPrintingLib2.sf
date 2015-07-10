@@ -1,0 +1,111 @@
+-- complete pretty printer library
+
+data Doc =	NIL
+        |	TEXT String Doc
+		|	LINE Int Doc
+		|	UNION Doc Doc
+;
+
+let nil = NIL
+;
+
+-- union operation
+let (<|>) (x: Doc) (y: Doc) : Doc =
+	UNION x y
+;
+
+
+let text (s: String): Doc =
+	TEXT s NIL
+;
+
+let line: Doc = 
+	LINE 0 NIL
+;
+
+-- union laws
+let rec (<>) (x: Doc) (y: Doc) : Doc =
+	case x of
+			UNION a b	-> (a <> y) <|> (b <> y)
+		|	TEXT s d 	-> TEXT s (d <> y)
+		|	LINE i e	-> LINE i (e <> y)		
+		|	NIL 		-> y
+;
+
+let rec nest (i: Int) (x: Doc): Doc =
+	case x of
+			UNION a b	-> (nest i a) <|> (nest i b)
+		|	TEXT s d 	-> TEXT s (nest i d)
+		|	LINE j c 	-> LINE (i+j) (nest i c)
+		|	NIL 		-> NIL
+;
+
+-- kill all the line, replace with sapce
+
+let rec flatten (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> TEXT " " (flatten x)
+		|	TEXT s x		-> TEXT s (flatten x)
+		|	UNION x y		-> flatten x
+;
+
+-- new api for user, tell lib where you want minimum line nums
+
+let rec group (d: Doc): Doc =
+	flatten d <|> d
+;
+
+-- judge whther the doc fit the line width
+
+let rec fits (w: Int) (d: Doc): Bool=
+	if w < 0 then False
+	else 
+		case d of
+				NIL 			-> True
+			|	TEXT s x 		-> fits (w - s.length()) x
+			|	LINE i x 		-> True
+			|	UNION _  _		-> False
+;
+
+-- return a better one, here better means max width within limit 
+
+let better (w: Int) (k: Int) (x: Doc) (y: Doc): Doc =
+	if fits (w - k) x then x
+	else  y
+;
+
+-- return the best layout among groups
+
+let rec best (w: Int) (k: Int) (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE i x 		-> LINE i (best w k x)
+		|	TEXT s x 		-> TEXT s (best w (k + s.length()) x)
+		|	UNION x y 		-> better w k (best w k x) (best w k y)
+;
+
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: Doc): String=
+	case doc of
+			TEXT s x	-> concat s (showDoc x)
+		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	NIL			-> ""
+		|	UNION x y 	-> "IMPOSSIBLE"
+;
+
+let pretty (w: Int) (d: Doc): String =
+	showDoc (best w 0 d)
+;
+

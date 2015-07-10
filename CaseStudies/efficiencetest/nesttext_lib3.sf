@@ -1,0 +1,13 @@
+{-#
+    INCLUDE "PrettyPrintingLib3.sf"
+#-}
+
+let rec looptext (x: Int) : Doc =
+	if x > 0 then
+		(looptext (x-1)) <> (text "1") 
+	else
+		NIL
+;
+
+
+pretty 30 (looptext 300)

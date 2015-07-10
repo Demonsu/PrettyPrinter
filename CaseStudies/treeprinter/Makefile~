@@ -1,0 +1,20 @@
+
+# Path to f2j compiler
+F2J      = f2j
+
+# Default flags to compiler
+F2JFLAGS = -m stack --inline
+
+
+printer: treeprinter.sf
+	$(F2J) -c $< $(F2JFLAGS)
+
+test: treeprinter.sf
+	$(F2J) -r $< $(F2JFLAGS)
+
+test2: treeprinter2.sf
+	$(F2J) -r $< $(F2JFLAGS)
+
+clean:
+	rm -f *.java *.class
+

@@ -1,0 +1,53 @@
+-- Show definition
+type Show[A] = A -> Doc;
+
+-- Maybe definition
+data Maybe[A] = Nothing
+              | Just A
+;
+
+-- Maybe to Document
+let showMaybe[A] (show: Show[A]) (mb: Maybe[A]): Doc=
+	case mb of
+			Nothing		-> NIL
+		|	Just x 		-> show x
+;
+
+data FJComment = FJLineComment String
+               | FJBlockComment String
+;
+data FJType = FJType String
+;
+type FJIdentifier = String
+;
+
+data FJExpr = FJVariable FJIdentifier
+            | FJFieldAccess FJExpr FJIdentifier
+            | FJMethodInvoke FJExpr FJIdentifier PList[FJExpr]
+            | FJSelfMethodInvoke FJIdentifier PList[FJExpr]
+            | FJAllocate FJType PList[FJExpr]
+            | FJTypeCast FJType FJExpr
+            | FJIntLiteral String
+            | FJBracketSurroundedExpr FJExpr
+;
+-- int a, b = 1;
+data FJVariableDef = FJVariableDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+data FJFieldDef = FJFieldDef FJType PList[(FJIdentifier, Maybe[FJExpr])]
+;
+data FJStmt = FJStmtVariableDef FJVariableDef
+            | FJStmtExpr FJExpr
+            | FJStmtBlock PList[FJStmt]
+            | FJStmtReturn FJExpr
+;
+data FJMethodParamDef = FJMethodParamDef FJType FJIdentifier Maybe[FJExpr]
+;
+
+data FJMethod = FJConstructor String PList[FJMethodParamDef] PList[FJStmt]
+              | FJNormalMethod String PList[FJMethodParamDef] FJType PList[FJStmt]
+;
+data rec FJClassBodyContent = FJClassMethod FJMethod
+                            | FJClassField FJFieldDef
+                            | FJInnerClass FJClass
+and FJClass = FJClass FJType Maybe[FJType] PList[FJClassBodyContent]
+;
