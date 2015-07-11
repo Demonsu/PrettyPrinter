@@ -1,0 +1,18 @@
+{-#
+    INCLUDE "simple_arith_expr_parser.sf"
+    INCLUDE "PrettyPrintingLib3.sf"
+    INCLUDE "ArithToDocument.sf"
+#-}
+
+let getFirst (l : ParseOutput[ArithExpr]): ArithExpr  =
+
+    case l of
+        Nil             ->  Integer 1
+     |  Cons x _        ->  x._1
+
+    --println result
+;
+let result = arithExpr `parseString[ArithExpr]` "(1+2)*(3-(4*5+(6*7)))-3*4"
+;
+
+pretty 30 (showArithExpr (getFirst result))

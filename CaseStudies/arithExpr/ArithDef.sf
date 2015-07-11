@@ -1,0 +1,6 @@
+data ArithExpr = Add ArithExpr ArithExpr
+               | Sub ArithExpr ArithExpr
+               | Mul ArithExpr ArithExpr
+               | Div ArithExpr ArithExpr
+               | Integer Int
+;

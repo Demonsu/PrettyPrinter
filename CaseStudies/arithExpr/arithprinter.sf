@@ -1,4 +1,3 @@
--- complete pretty printer library
 
 data Doc =	NIL
         |	TEXT String
@@ -8,14 +7,12 @@ data Doc =	NIL
 		|   CONCAT Doc Doc
 ;
 
--- for docpair list, seperating from lazy PList outside
 
 data DList[A] = DNil
-              | Consd A (DList[A])
+              | Cons A (DList[A])
 ;
 
 
--- print doc, for converting into string
 
 data PDoc = NI
 		|	TE String PDoc
@@ -28,7 +25,6 @@ type Pair = (Int, Doc)
 let nil = NIL
 ;
 
--- union operation
 let (<|>) (x: Doc) (y: Doc) : Doc =
 	UNION x y
 ;
@@ -42,7 +38,6 @@ let line: Doc =
 	LINE
 ;
 
--- union laws
 let (<>) (x: Doc) (y: Doc) : Doc =
 	CONCAT x y
 ;
@@ -51,7 +46,6 @@ let nest (i: Int) (x: Doc): Doc =
 	NEST i x
 ;
 
--- kill all the line, replace with sapce
 
 let rec flatten (d: Doc): Doc =
 	case d of
@@ -63,13 +57,11 @@ let rec flatten (d: Doc): Doc =
 		|	CONCAT x y 		-> (flatten x) <> (flatten y)
 ;
 
--- new api for user, tell lib where you want minimum line nums
 
 let rec group (d: Doc): Doc =
 	(flatten d) <|> d
 ;
 
--- judge whther the doc fit the line width
 
 let rec fits (w: Int) (d: PDoc): Bool=
 	if w < 0 then False
@@ -80,7 +72,6 @@ let rec fits (w: Int) (d: PDoc): Bool=
 			|	LI i x 	  		-> True
 ;
 
--- return a better one, here better means max width within limit 
 
 let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
 	if fits (w - k) x then x
@@ -92,26 +83,25 @@ let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
 let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 	case docs of
 			DNil 					-> NI
-		|	Consd x xs				->
+		|	Cons x xs				->
 			{
 				case x._2 of
 					NIL 			-> be w k xs
-				|	CONCAT d1 d2	-> be w k (Consd[Pair] (x._1, d1) (Consd[Pair] (x._1, d2) xs))                       
-				|	NEST j d		-> be w k (Consd[Pair] (j + x._1, d)  xs)
+				|	CONCAT d1 d2	-> be w k (Cons[Pair] (x._1, d1) (Cons[Pair] (x._1, d2) xs))                       
+				|	NEST j d		-> be w k (Cons[Pair] (j + x._1, d)  xs)
 				|   TEXT s 			-> TE s (be w k xs)
 				| 	LINE 			-> LI x._1 (be w k xs)
-				|	UNION d1 d2 	-> better w k (be w k (Consd[Pair] (x._1, d1) xs)) (be w k (Consd[Pair] (x._1, d2) xs))
+				|	UNION d1 d2 	-> better w k (be w k (Cons[Pair] (x._1, d1) xs)) (be w k (Cons[Pair] (x._1, d2) xs))
 
 			}
 
 
 ;
 
--- return the best layout among groups
 
 let best (w: Int) (k: Int) (d: Doc): PDoc =
 
-	be w k (Consd[Pair] (0, d) (DNil[Pair]))
+	be w k (Cons[Pair] (0, d) (DNil[Pair]))
 ;
 
 let concat (x : String) (y : String): String= 
@@ -138,3 +128,41 @@ let pretty (w: Int) (d: Doc): String =
 
 
 
+data ArithExpr = Add ArithExpr ArithExpr
+               | Sub ArithExpr ArithExpr
+               | Mul ArithExpr ArithExpr
+               | Div ArithExpr ArithExpr
+               | Integer Int
+;
+
+
+let rec braketExpr (expr: ArithExpr): Doc =
+
+	(text "(") <> (showArithExpr expr) <> (text ")")
+
+and
+
+isAddSub (expr: ArithExpr): Doc =
+
+	case expr of
+			Add _ _ 	->	braketExpr expr
+		|	Sub _ _ 	->	braketExpr expr
+		|	_			->	showArithExpr expr
+
+and
+
+showArithExpr (expr: ArithExpr): Doc =
+	case expr of
+			Add	e1 e2		-> (showArithExpr e1) <> (text " + ") <> (showArithExpr e2)
+		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (showArithExpr e2)
+		|	Mul e1 e2		-> (isAddSub e1) 	  <> (text " * ") <> (isAddSub e2)
+		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (isAddSub e2)
+		|	Integer x 		-> text x.toString() 
+;
+
+
+
+let expr= Mul (Add (Sub (Integer 1) (Integer 2)) (Div (Integer 3) (Integer 4))) (Sub (Mul (Add (Integer 5) (Integer 6)) (Integer 7)) (Integer 8))
+;
+
+pretty 30 (showArithExpr expr)

@@ -1,0 +1,940 @@
+
+
+type Show[A] = A -> String;
+type Eq[A] = A -> A -> Bool;
+
+let charEq (a : Char) (b : Char) : Bool = a.equals(b);
+let intEq (a : Int) (b : Int) : Bool = a.equals(b);
+let boolEq (a : Bool) (b : Bool) : Bool = a.equals(b);
+let unitEq (a : Unit) (b : Unit) : Bool = a == b;
+let stringEq (a : String) (b : String) : Bool = a.equals(b);
+
+let charToString (a : Char) : String = a.toString();
+let intToString (a : Int) : String = a.toString();
+let boolToString (a : Bool) : String = a.toString();
+let unitToString (a : Unit) : String = "()";
+let stringToString (a : String) : String = a;
+
+data Maybe[A] = Nothing
+              | Just A
+              ;
+
+let maybeToString[A] (tostr : Show[A]) (m : Maybe[A]) : String =
+    case m of
+        Nothing     -> "Nothing"
+     |  Just x      -> "Just \{tostr x}";
+
+let maybeEq[A] (eq : Eq[A]) (a : Maybe[A]) (b : Maybe[A]) : Bool =
+    case a of
+        Nothing     ->  {
+            case b of
+                Nothing     -> True
+             |  Just _      -> False
+        }
+     |  Just xa     ->  {
+            case b of
+                Nothing     -> False
+             |  Just xb     -> xa `eq` xb
+        };
+type Thunk[A] = Unit -> A;
+
+let invoke[A] (t : Thunk[A]) : A =
+    t ();
+data Result[S, E] = Ok S
+                  | Err E
+                  ;
+
+let resultEq[S, E] (eqs : Eq[S]) (eqe : Eq[E]) (a : Result[S, E]) (b : Result[S, E]) : Bool =
+    case a of
+        Ok s1 -> {
+            case b of
+                Ok s2 -> eqs s1 s2
+             |  Err _ -> False
+        }
+     |  Err e1 -> {
+            case b of
+                Ok _   -> False
+             |  Err e2 -> eqe e1 e2
+        };
+
+let resultToString[S, E] (sToStr : Show[S]) (eToStr : Show[E]) (r : Result[S, E]) : String =
+    case r of
+        Ok s    -> "Ok \{sToStr s}"
+     |  Err e   -> "Err \{eToStr e}";
+data Order = Equals
+           | GreaterThan
+           | LessThan
+           ;
+
+data PList[A] = Nil
+              | Cons A (Thunk[PList[A]])
+              ;
+
+let rec nats (beg : Int) : PList[Int] =
+    Cons[Int] beg (\(__ : Unit) -> nats (beg+1));
+
+
+let singleton[A] (x : A) : PList[A] =
+    Cons[A] x (\(__: Unit) -> (Nil[A]));
+
+let rec map[A, B] (f : A -> B) (l : PList[A]) : PList[B] =
+    case l of
+        Nil             ->      Nil[B]
+     |  Cons x xs       ->      Cons[B] (f x) (\(__ : Unit) -> (map[A, B] f (invoke[PList[A]] xs)));
+
+let rec foldl[A, B] (f : B -> A -> B) (z : B) (l : PList[A]) : B =
+    case l of
+        Nil             ->      z
+     |  Cons x xs       ->      foldl[A, B] f (f z x) (invoke[PList[A]] xs);
+
+
+let foldr[A, B] (f : A -> B -> B) (z : B) (l : PList[A]) : B =
+    let rec inner (s : PList[A]) (k : B -> B) : B =
+        case s of
+            Nil         -> k z
+         |  Cons x xs   -> inner (invoke[PList[A]] xs) (\(y : B) -> k (f x y));
+    inner l (\(x : B) -> x);
+
+
+let join[A] (l : PList[A]) (j : A) : PList[A] =
+    let rec inner[A] (l : PList[A]) (j : A) : PList[A] =
+        case l of
+            Nil         -> (Nil[A])
+         |  Cons x xs   -> (Cons[A] j (\(__ : Unit) ->
+                                (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j))));
+    case l of
+        Nil         -> (Nil[A])
+     |  Cons x xs   -> (Cons[A] x (\(__ : Unit) -> inner[A] (invoke[PList[A]] xs) j));
+
+let (+>)[A] (a : A) (l : PList[A]) : PList[A] =
+    Cons[A] a (\(__ : Unit) -> l);
+
+let rec concat2[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    case a of
+        Nil         ->  b
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (concat2[A] (invoke[PList[A]] xs) b));
+
+let rec lazyconcat2[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    case a of
+        Nil         ->  (invoke[PList[A]] b)
+      | Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (lazyconcat2[A] (invoke[PList[A]] xs) b));
+
+let (++)[A] (a : PList[A]) (b : PList[A]) : PList[A] =
+    concat2[A] a b;
+
+let (+~)[A] (a : PList[A]) (b : Thunk[PList[A]]) : PList[A] =
+    lazyconcat2[A] a b;
+
+let rec concat[A] (l : PList[PList[A]]) : PList[A] =
+    case l of
+        Nil         ->  Nil[A]
+     |  Cons x xs   ->  x +~[A] (\(__ : Unit) -> (concat[A] (invoke[PList[PList[A]]] xs)));
+
+let rec len[A] (l : PList[A]) : Int =
+    case l of
+        Nil         ->  0
+     |  Cons _ xs   ->  1 + (len[A] (invoke[PList[A]] xs));
+
+let isempty[A] (l : PList[A]) : Bool =
+    case l of
+        Nil         -> True
+     |  Cons _ _    -> False;
+
+let first[A] (l : PList[A]) : Maybe[A] =
+    case l of
+        Nil         -> Nothing[A]
+     |  Cons x _    -> Just[A] x;
+
+let rest[A] (l : PList[A]) : Maybe[PList[A]] =
+    case l of
+        Nil         -> Nothing[PList[A]]
+     |  Cons _ xs   -> Just[PList[A]] (invoke[PList[A]] xs);
+
+let rec take[A] (n : Int) (l : PList[A]) : PList[A] =
+    if n <= 0 then
+        (Nil[A])
+    else
+        case l of
+            Nil         ->  Nil[A]
+         |  Cons x xs   ->  Cons[A] x (\(__ : Unit) -> (take[A] (n-1) (invoke[PList[A]] xs)));
+
+let rec zip[A, B] (a : PList[A]) (b : PList[B]) : PList[(A, B)] =
+    case a of
+        Nil         -> Nil[(A, B)]
+     |  Cons xa xsa ->
+            case b of
+                Nil         -> Nil[(A, B)]
+             |  Cons xb xsb ->
+                    Cons[(A, B)] (xa, xb) (\(__ : Unit) -> zip[A, B] (invoke[PList[A]] xsa) (invoke[PList[B]] xsb));
+
+let pListToString[A] (tostr : A -> String) (l : PList[A]) : String =
+    type StringBuilder = java.lang.StringBuilder;
+
+    let inner = foldl[String, StringBuilder]
+                    (\(b : StringBuilder) (a : String) -> b.append(a))
+                    (new java.lang.StringBuilder("["))
+                    (join[String] (map[A, String] tostr l) ", ");
+
+    inner.append("]").toString();
+
+let rec pListEq[A] (eq : Eq[A]) (a : PList[A]) (b : PList[A]) : Bool =
+    case a of
+        Nil         -> { case b of Nil -> True | Cons _ _ -> False }
+     |  Cons ax axs ->
+            case b of
+                Nil         -> False
+             |  Cons bx bxs -> if eq ax bx then
+                                    pListEq[A] eq (invoke[PList[A]] axs) (invoke[PList[A]] bxs)
+                               else False;
+
+
+type PString = PList[Char];
+
+let pStringToString (l : PString) : String =
+    (foldl[Char, java.lang.StringBuilder]
+        (\(b : java.lang.StringBuilder) (a : Char) -> b.append(a))
+        (new java.lang.StringBuilder( ))
+        l).toString();
+
+let pStringFromString (str : String) : PString =
+    let rec inner (str : String) (idx : Int) : PString =
+        if idx `intEq` str.length() then
+            (Nil[Char])
+        else
+            (Cons[Char] str.charAt(idx) (\(__ : Unit) -> (inner str (idx+1))));
+    inner str 0;
+
+let rec pStringEq (a : PString) (b : PString) : Bool =
+    pListEq[Char] charEq a b;
+
+let rec charin (c : Char) (str : PString) : Bool =
+    case str of
+        Nil         ->      False
+     |  Cons x xs   ->      if x.equals(c) then
+                                True
+                            else
+                                (charin c (invoke[PString] xs));
+
+type State[S, A] = S -> (A, S);
+
+data Message = SysUnexpected String
+             | Unexpected String
+             | Expect String
+             | Message String
+             ;
+
+let messageToString (e : Message) : String =
+    case e of
+        SysUnexpected s     -> "SysUnexpected \{s}"
+     |  Unexpected s        -> "Unexpected \{s}"
+     |  Expect s            -> "Expect \{s}"
+     |  Message s           -> "Message \{s}";
+
+type SourceName   = String;
+type Line         = Int;
+type Column       = Int;
+
+data SourcePos = SourcePos SourceName Line Column;
+
+let newSourcePos (name : SourceName) (line : Line) (column : Column) : SourcePos =
+    SourcePos name line column;
+
+let initialPos (s : SourceName) : SourcePos =
+    SourcePos s 1 1;
+
+let sourceName (p : SourcePos) : SourceName =
+    case p of
+        SourcePos name _ _ -> name;
+
+let sourceLine (p : SourcePos) : Line =
+    case p of
+        SourcePos _ line _ -> line;
+
+let sourceColumn (p : SourcePos) : Column =
+    case p of
+        SourcePos _ _ c -> c;
+
+let incSourceLine (p : SourcePos) (n : Line) : SourcePos =
+    case p of
+        SourcePos name line col -> SourcePos name (line+n) col;
+
+let incSourceColumn (p : SourcePos) (n : Column) : SourcePos =
+    case p of
+        SourcePos name line col -> SourcePos name line (col+n);
+
+let updatePosChar (p : SourcePos) (c : Char) : SourcePos =
+    if c `charEq` '\n' then
+        case p of
+            SourcePos name line col -> SourcePos name (line+1) 1
+    else
+        incSourceColumn p 1;
+
+let updatePosPString (p : SourcePos) (s : PString) : SourcePos =
+    foldl[Char, SourcePos] updatePosChar p s;
+
+let sourcePosToString (p : SourcePos) : String =
+    case p of
+        SourcePos name line col ->
+            "\"\{name}\" (\{line}:\{col})";
+
+let sourcePosCompare (p1 : SourcePos) (p2 : SourcePos) : Order =
+    case p1 of
+        SourcePos _ line1 col1 ->
+            case p2 of
+                SourcePos _ line2 col2 ->
+                    if line1 < line2 then LessThan
+                    else if line1 > line2 then GreaterThan
+                    else if col1 < col2 then LessThan
+                    else if col1 > col2 then GreaterThan
+                    else Equals;
+
+let sourcePosEq (p1 : SourcePos) (p2 : SourcePos) : Bool =
+    case p1 `sourcePosCompare` p2 of
+        Equals      -> True
+     |  GreaterThan -> False
+     |  LessThan    -> False;
+
+data ParseError = ParseError SourcePos PList[Message];
+
+let errorPos (p : ParseError) : SourcePos =
+    case p of
+        ParseError pos _ -> pos;
+
+let errorMessages (p : ParseError) : PList[Message] =
+    case p of
+        ParseError _ msgs -> msgs;
+
+let errorIsUnknown (p : ParseError) : Bool =
+    case p of
+        ParseError _ msgs -> isempty[Message] msgs;
+
+let newErrorUnknown (pos : SourcePos) : ParseError =
+    ParseError pos (Nil[Message]);
+
+let newErrorMessage (msg : Message) (pos : SourcePos) =
+    ParseError pos (singleton[Message] msg);
+
+let addErrorMessage (msg : Message) (err : ParseError) =
+    case err of
+        ParseError pos msgs -> ParseError pos (msg +>[Message] msgs);
+
+let mergeError (err1 : ParseError) (err2 : ParseError) : ParseError =
+    case err1 of
+        ParseError pos1 msgs1 ->
+            case err2 of
+                ParseError pos2 msgs2 ->
+                    if isempty[Message] msgs1 then err2
+                    else if isempty[Message] msgs2 then err1
+                    else
+                        case pos1 `sourcePosCompare` pos2 of
+                            Equals      ->  ParseError pos1 (msgs1 ++[Message] msgs2)
+                         |  GreaterThan ->  err1
+                         |  LessThan    ->  err2;
+
+let parseErrorToString (err : ParseError) : String =
+    case err of
+        ParseError pos msgs ->
+            "\{sourcePosToString pos}:\{pListToString[Message] messageToString msgs}";
+
+
+type ParsePos = (SourcePos, SourcePos);
+
+let parseBeginPos (p : ParsePos) : SourcePos =
+    p._1;
+
+let parseEndPos (p : ParsePos) : SourcePos =
+    p._2;
+
+let parsePosEq (a : ParsePos) (b : ParsePos) : Bool =
+    (a._1 `sourcePosEq` b._1) && (a._2 `sourcePosEq` b._2);
+
+let parsePosToString (a : ParsePos) : String =
+    "\{sourcePosToString a._1}..\{sourcePosToString a._2}";
+
+
+type ParseResult[A] = (A, ParsePos);
+
+let parseResultValue[A] (r : ParseResult[A]) : A =
+    r._1;
+
+let parseResultPos[A] (r : ParseResult[A]) : ParsePos =
+    r._2;
+
+let parseResultEq[A] (eq : Eq[A]) (a : ParseResult[A]) (b : ParseResult[A]) : Bool =
+    (a._1 `eq` b._1) && (a._2 `parsePosEq` b._2);
+
+let parseResultToString[A] (str : Show[A]) (res : ParseResult[A]) : String =
+    "(\{str res._1}, \{parsePosToString res._2})";
+
+type ParseInput = (SourcePos, PString);
+
+let newParseInput (pos : SourcePos) (src : PString) : ParseInput =
+    (pos, src);
+
+let parseInputPos (inp : ParseInput) : SourcePos =
+    inp._1;
+
+let parseInputData (inp : ParseInput) : PString =
+    inp._2;
+
+let parseInputInit (src : PString) : ParseInput =
+    (initialPos "<default>", src);
+
+let parseInputInitWithName (name : String) (src : PString) : ParseInput =
+    (initialPos "<default>", src);
+
+let parseInputEq (a : ParseInput) (b : ParseInput) : Bool =
+    (a._1 `sourcePosEq` b._1) && (a._2 `pStringEq` b._2);
+
+let parseInputToString (a : ParseInput) : String =
+    "\"\{pStringToString a._2}\" @ \"\{sourcePosToString a._1}\"";
+
+type ParseContext[A] = (A, ParseInput);
+
+let newParseContext[A] (a : A) (inp : ParseInput) : ParseContext[A] =
+    (a, inp);
+
+let parseContextResult[A] (c : ParseContext[A]) : A =
+    c._1;
+
+let parseContextInput[A] (c : ParseContext[A]) : ParseInput =
+    c._2;
+
+let parseContextEq[A] (eq : Eq[A]) (a : ParseContext[A]) (b : ParseContext[A]): Bool =
+    (eq a._1 b._1) && (a._2 `parseInputEq` b._2);
+
+let parseContextToString[A] (str : Show[A]) (c : ParseContext[A]) : String =
+    "(\{str c._1}, \{parseInputToString c._2})";
+
+
+type ParseOutput[A] = PList[ParseContext[A]];
+
+let parseOutputEq[A] (eq : Eq[A]) (a : ParseOutput[A]) (b : ParseOutput[A]) : Bool =
+    pListEq[ParseContext[A]]
+        (parseContextEq[A] eq)
+        a b;
+
+let parseOutputToString[A] (str : Show[A]) (res : ParseOutput[A]) : String =
+    pListToString[ParseContext[A]]
+        (parseContextToString[A] str)
+        res;
+
+type Parser[A] = ParseInput -> ParseOutput[A];
+
+let parseString[A] (p : Parser[A]) (src : String) : ParseOutput[A] =
+    p (parseInputInit (pStringFromString src));
+
+let parsePString[A] (p : Parser[A]) (src : PString) : ParseOutput[A] =
+    p (parseInputInit src);
+
+let parsePStringWithName[A] (p : Parser[A]) (name : String) (src : PString) : ParseOutput[A] =
+    p (parseInputInitWithName name src);
+
+let parseStringWithName[A] (p : Parser[A]) (name : String) (src : String) : ParseOutput[A] =
+    p (parseInputInitWithName name (pStringFromString src));
+
+
+let result[V] (value : V) : Parser[V] =
+    \(inp : ParseInput) -> singleton[ParseContext[V]] (newParseContext[V] value inp);
+
+let zero[V] : Parser[V] =
+    \(inp : ParseInput) -> Nil[ParseContext[V]];
+
+let item : Parser[Char] =
+    \(inp : ParseInput) ->
+        case parseInputData inp of
+            Nil         ->      Nil[ParseContext[Char]]
+          | Cons c xs   ->
+                singleton[ParseContext[Char]]
+                    (newParseContext[Char] c (newParseInput (updatePosChar (parseInputPos inp) c) (invoke[PString] xs)));
+
+
+let bind[A, B] (p : Parser[A]) (f : A -> Parser[B]) : Parser[B] =
+    \(inp : ParseInput) ->
+        concat[ParseContext[B]]
+              (map[ParseContext[A], ParseOutput[B]]
+                  (\(v : ParseContext[A]) -> f (parseContextResult[A] v) (parseContextInput[A] v)) (p inp));
+
+let (>>=)[A, B] (p : Parser[A]) (f : A -> Parser[B]) : Parser[B] =
+    bind[A, B] p f;
+
+let (>>)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[B] =
+    p >>=[A, B] (\(__ : A) -> q);
+
+let (<*)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[A] =
+    p >>=[A, A] (\(a : A) ->
+    q >>=[B, A] (\(__ : B) ->
+    result[A] a));
+
+let (*>)[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[B] =
+    p >>[A, B] q;
+
+let using[A, B] (p : Parser[A]) (f : A -> B) : Parser[B] =
+    bind[A, B] p (\(a : A) -> result[B] (f a));
+
+let (<$>)[A, B] (p : Parser[A]) (f : A -> B) : Parser[B] =
+    using[A, B] p f;
+
+let ($>)[A, B] (p : Parser[A]) (b : B) : Parser[B] =
+    using[A, B] p (\(__ : A) -> b);
+
+let seq[A, B] (p : Parser[A]) (q : Parser[B]) : Parser[(A, B)] =
+    bind[A, (A, B)] p (\(x : A) ->
+    bind[B, (A, B)] q (\(y : B) ->
+    result[(A, B)] (x, y)));
+
+let choice[A] (p : Parser[A]) (q : Parser[A]) : Parser[A] =
+    \(inp : ParseInput) ->
+        (p inp) +~[ParseContext[A]] (\(__ : Unit) -> q inp);
+
+let (<|>)[A] (p : Parser[A]) (q : Parser[A]) : Parser[A] =
+    choice[A] p q;
+
+let sat (f : Char -> Bool) : Parser[Char] =
+    bind[Char, Char] item (\(x : Char) -> if f x then (result[Char] x) else zero[Char]);
+
+let char (x : Char) : Parser[Char] =
+    sat (\(y : Char) -> x `charEq` y);
+
+let notchar (x : Char) : Parser[Char] =
+    sat (\(y : Char) -> x != y);
+
+let digit : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isDigit(x));
+
+let upper : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isUpperCase(x));
+
+let lower : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isLowerCase(x));
+
+let space : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isSpaceChar(x));
+
+let whitespace : Parser[Char] =
+    sat (\(x : Char) -> java.lang.Character.isWhitespace(x));
+
+let letter : Parser[Char] =
+    choice[Char] lower upper;
+
+let alphanum : Parser[Char] =
+    choice[Char] letter digit;
+
+let noneof (s : String) : Parser[Char] =
+    sat (\(x : Char) -> (charin x (pStringFromString s)) `boolEq` False);
+
+let oneof (s : String) : Parser[Char] =
+    sat (\(x : Char) -> (charin x (pStringFromString s)));
+
+let rec stringWithPString (s : PString) : Parser[PString] =
+    case s of
+        Nil         ->  result[PString] (Nil[Char])
+     |  Cons x xs   ->
+            let xs = invoke[PString] xs;
+            (char x)
+                >>[Char, PString] (stringWithPString xs)
+                $>[PString, PString] (x +>[Char] xs);
+
+let string (s : String) : Parser[PString] =
+    stringWithPString (pStringFromString s);
+
+let eol : Parser[Unit] =
+    ((string "\r\n") $>[PString, Unit] ())
+        <|>[Unit] ((char '\r')    $>[Char, Unit] ())
+        <|>[Unit] ((char '\n')    $>[Char, Unit] ());
+
+let eof : Parser[Unit] =
+    \(inp : ParseInput) ->
+        case parseInputData inp of
+            Nil         -> singleton[ParseContext[Unit]] (newParseContext[Unit] () inp)
+         |  Cons _ _    -> (Nil[ParseContext[Unit]]);
+
+
+let rec many[A] (p : Parser[A]) : Parser[PList[A]] =
+    choice[PList[A]] (bind[A, PList[A]] p (\(x : A) ->
+                      bind[PList[A], PList[A]] (many[A] p) (\(xs : PList[A]) ->
+                      result[PList[A]] (x +>[A] xs))))
+                     (result[PList[A]] (Nil[A]));
+
+let many1[A] (p : Parser[A]) : Parser[PList[A]] =
+    bind[A, PList[A]] p (\(x : A) ->
+    bind[PList[A], PList[A]] (many[A] p) (\(xs : PList[A]) ->
+    result[PList[A]] (x +>[A] xs)));
+
+let word : Parser[PString] =
+    many1[Char] letter;
+
+let ident : Parser[PString] =
+    bind[Char, PString]    lower (\(x : Char) ->
+    bind[PString, PString] (many[Char] alphanum) (\(xs : PString) ->
+    result[PString] (x +>[Char] xs)));
+
+let natural : Parser[Int] =
+    let eval (xs : PList[Char]) =
+        foldl[Int, Int] (\(b : Int) (a : Int) -> 10 * b + a)
+                        0
+                        (map[Char, Int] (\(c : Char) -> java.lang.Character.digit(c, 10)) xs);
+
+    bind[PList[Char], Int] (many1[Char] digit) (\(xs : PList[Char]) -> result[Int] (eval xs));
+
+let hexdecimal : Parser[Int] =
+    let eval (xs : PList[Char]) =
+        foldl[Int, Int] (\(b : Int) (a : Int) -> 16 * b + a)
+                        0
+                        (map[Char, Int] (\(c : Char) -> java.lang.Character.digit(c, 16)) xs);
+    (many1[Char] (oneof "1234567890abcdefABCDEF"))
+        <$>[PList[Char], Int] (\(xs : PList[Char]) -> eval xs);
+
+let int : Parser[Int] =
+    choice[Int] ((char '-') >>[Char, Int]
+                 (using[Int,Int] natural (\(n : Int) -> (-n))))
+              natural;
+
+
+let sepby1[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    let rep[A, B] (p : Parser[A]) : Parser[A] =
+        bind[B, A] sep (\(s : B) -> bind[A, A] p (\(y : A) -> result[A] y));
+    bind[A, PList[A]]        p                       (\(x : A) ->
+    bind[PList[A], PList[A]] (many[A] (rep[A, B] p)) (\(xs : PList[A]) ->
+    result[PList[A]] (Cons[A] x (\(__ : Unit) -> xs))));
+
+let sepby2[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    let rep[A, B] (p : Parser[A]) : Parser[A] =
+        bind[B, A] sep (\(s : B) -> bind[A, A] p (\(y : A) -> result[A] y));
+    bind[A, PList[A]]        p                       (\(x : A) ->
+    bind[PList[A], PList[A]] (many1[A] (rep[A, B] p)) (\(xs : PList[A]) ->
+    result[PList[A]] (Cons[A] x (\(__ : Unit) -> xs))));
+
+let sepby[A, B] (p : Parser[A]) (sep : Parser[B]) : Parser[PList[A]] =
+    choice[PList[A]] (sepby1[A, B] p sep) (result[PList[A]] (Nil[A]));
+
+let between[L, R, P] (l : Parser[L]) (r : Parser[R]) (p : Parser[P]) : Parser[P] =
+    l *>[L, P] p <*[P, R] r;
+
+
+let chainl1[A] (p : Parser[A]) (op : Parser[A -> A -> A]) : Parser[A] =
+    let fy =
+        bind[A -> A -> A, (A -> A -> A, A)] op (\(f : A -> A -> A) ->
+        bind[A, (A -> A -> A, A)]           p  (\(y : A) ->
+        result[(A -> A -> A, A)] (f, y)));
+
+    bind[A, A]                           p                            (\(x : A) ->
+    bind[PList[(A -> A -> A, A)], A]     (many[(A -> A -> A, A)] fy)  (\(fys: PList[(A -> A -> A, A)]) ->
+    result[A] (foldl[(A -> A -> A, A), A] (\(x : A) (fy : (A -> A -> A, A)) -> fy._1 x fy._2) x fys)));
+
+let rec chainr1[A] (p : Parser[A]) (op : Parser[A -> A -> A]) : Parser[A] =
+    bind[A, A] p (\(x : A) ->
+        choice[A] (bind[A -> A -> A, A] op (\(f : A -> A -> A) ->
+                 bind[A, A] (chainr1[A] p op) (\(y : A) -> -- Calculate the result on the right
+                 result[A] (f x y))))
+                (result[A] x));
+
+let chainl[A] (p : Parser[A]) (op : Parser[A -> A -> A]) (v : A) : Parser[A] =
+    choice[A] (chainl1[A] p op) (result[A] v);
+
+let chainr[A] (p : Parser[A]) (op : Parser[A -> A -> A]) (v : A) : Parser[A] =
+    choice[A] (chainr1[A] p op) (result[A] v);
+
+
+let parenthesis[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '(') (char ')') p;
+
+let braces[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '{') (char '}') p;
+
+let angles[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '<') (char '>') p;
+
+let brackets[P] (p : Parser[P]) : Parser[P] =
+    between[Char, Char, P] (char '[') (char ']') p;
+
+
+
+let only[A] (p : Parser[A]) : Parser[A] =
+    \(inp : ParseInput) -> take[ParseContext[A]] 1 (p inp);
+
+
+
+{-
+    expr ::= term | expr + term | expr - term
+    term ::= factor | term * factor | term / factor
+    factor ::= number | ( expr )
+
+    expr ::= term expr'
+    expr' ::= e | + term expr' | - term expr'
+    term ::= factor term'
+    term' ::= e | * factor term' | / factor term'
+    factor ::= number | ( expr )
+-}
+
+data ArithExpr = Add ArithExpr ArithExpr
+               | Sub ArithExpr ArithExpr
+               | Mul ArithExpr ArithExpr
+               | Div ArithExpr ArithExpr
+               | Integer Int
+               ;
+
+let rec arithExprToString (e : ArithExpr) : String =
+    case e of
+        Add e1 e2 -> "Add(\{arithExprToString e1}, \{arithExprToString e2})"
+     |  Sub e1 e2 -> "Sub(\{arithExprToString e1}, \{arithExprToString e2})"
+     |  Mul e1 e2 -> "Mul(\{arithExprToString e1}, \{arithExprToString e2})"
+     |  Div e1 e2 -> "Div(\{arithExprToString e1}, \{arithExprToString e2})"
+     |  Integer i -> "Integer(\{intToString i})"
+     ;
+
+let rec arithExprEq (a : ArithExpr) (b : ArithExpr) : Bool =
+    case a of
+        Add ae1 ae2 -> {
+            case b of
+                Add be1 be2 -> (arithExprEq ae1 be1) && (arithExprEq ae2 be2)
+             |  _ -> False
+        }
+     |  Sub ae1 ae2 -> {
+            case b of
+                Sub be1 be2 -> (arithExprEq ae1 be1) && (arithExprEq ae2 be2)
+             |  _ -> False
+        }
+     |  Mul ae1 ae2 -> {
+            case b of
+                Mul be1 be2 -> (arithExprEq ae1 be1) && (arithExprEq ae2 be2)
+             |  _ -> False
+        }
+     |  Div ae1 ae2 -> {
+            case b of
+                Div be1 be2 -> (arithExprEq ae1 be1) && (arithExprEq ae2 be2)
+             |  _ -> False
+        }
+     |  Integer ai -> {
+            case b of
+                Integer bi -> (ai == bi)
+             |  _ -> False
+        }
+     ;
+
+let arithExprSpace : Parser[Unit] =
+    many[Char] space $>[PList[Char], Unit] ();
+
+let arithExprBracketSurrounded[E] (p : Parser[E]) : Parser[E] =
+    between[Char, Char, E]
+        ((char '(') <*[Char, Unit] arithExprSpace)
+        ((char ')') <*[Char, Unit] arithExprSpace)
+        p;
+
+let arithExprAddSub : Parser[ArithExpr -> ArithExpr -> ArithExpr] =
+    let addop (a : ArithExpr) (b : ArithExpr) = Add a b;
+    let subop (a : ArithExpr) (b : ArithExpr) = Sub a b;
+
+    let add = (char '+') $>[Char, ArithExpr -> ArithExpr -> ArithExpr] addop;
+    let sub = (char '-') $>[Char, ArithExpr -> ArithExpr -> ArithExpr] subop;
+
+    add `choice[ArithExpr -> ArithExpr -> ArithExpr]` sub;
+
+let arithExprMulDiv : Parser[ArithExpr -> ArithExpr -> ArithExpr] =
+    let mulop (a : ArithExpr) (b : ArithExpr) = Mul a b;
+    let divop (a : ArithExpr) (b : ArithExpr) = Div a b;
+
+    let mul = (char '*') $>[Char, ArithExpr -> ArithExpr -> ArithExpr] mulop;
+    let div = (char '/') $>[Char, ArithExpr -> ArithExpr -> ArithExpr] divop;
+
+    mul `choice[ArithExpr -> ArithExpr -> ArithExpr]` div;
+
+let arithExprInteger : Parser[ArithExpr] =
+    natural <$>[Int, ArithExpr] (\(i : Int) -> Integer i);
+
+let rec arithExpr : Parser[ArithExpr] =
+    \(s : ParseInput) ->
+        chainl1[ArithExpr]
+            (arithExprTerm <*[ArithExpr, Unit] arithExprSpace)
+            (arithExprAddSub <*[ArithExpr -> ArithExpr -> ArithExpr, Unit] arithExprSpace)
+            s
+and arithExprFactor : Parser[ArithExpr] =
+    \(s : ParseInput) ->
+        choice[ArithExpr]
+            (arithExprInteger <*[ArithExpr, Unit] arithExprSpace)
+            ((arithExprBracketSurrounded[ArithExpr] arithExpr) <*[ArithExpr, Unit] arithExprSpace)
+            s
+and arithExprTerm : Parser[ArithExpr] =
+    \(s : ParseInput) ->
+        chainl1[ArithExpr]
+            (arithExprFactor <*[ArithExpr, Unit] arithExprSpace)
+            (arithExprMulDiv <*[ArithExpr -> ArithExpr -> ArithExpr, Unit] arithExprSpace)
+            s;
+
+let rec arithExprEval (e : ArithExpr) : Int =
+    case e of
+        Integer i -> i
+     |  Add e1 e2 -> (arithExprEval e1) + (arithExprEval e2)
+     |  Sub e1 e2 -> (arithExprEval e1) - (arithExprEval e2)
+     |  Mul e1 e2 -> (arithExprEval e1) * (arithExprEval e2)
+     |  Div e1 e2 -> (arithExprEval e1) / (arithExprEval e2)
+     ;
+
+data Doc =	NIL
+        |	TEXT String
+		|	LINE
+		|	NEST Int Doc
+		|	UNION Doc Doc
+		|   CONCAT Doc Doc
+;
+
+
+data DList[A] = DNil
+              | Consd A (DList[A])
+;
+
+
+
+data PDoc = NI
+		|	TE String PDoc
+		|	LI Int PDoc
+;
+
+type Pair = (Int, Doc)
+;
+
+let nil = NIL
+;
+
+let (<|>) (x: Doc) (y: Doc) : Doc =
+	UNION x y
+;
+
+
+let text (s: String): Doc =
+	TEXT s
+;
+
+let line: Doc = 
+	LINE
+;
+
+let (<>) (x: Doc) (y: Doc) : Doc =
+	CONCAT x y
+;
+
+let nest (i: Int) (x: Doc): Doc =
+	NEST i x
+;
+
+
+let rec flatten (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE 			-> TEXT " "
+		|	TEXT s 			-> TEXT s 
+		|	NEST i x 		-> NEST i (flatten x)
+		|	UNION x y		-> flatten x
+		|	CONCAT x y 		-> (flatten x) <> (flatten y)
+;
+
+
+let rec group (d: Doc): Doc =
+	(flatten d) <|> d
+;
+
+
+let rec fits (w: Int) (d: PDoc): Bool=
+	if w < 0 then False
+	else 
+		case d of
+				NI 				-> True
+			|	TE s x  		-> fits (w - s.length()) x
+			|	LI i x 	  		-> True
+;
+
+
+let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
+	if fits (w - k) x then x
+	else  y
+;
+
+
+
+let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
+	case docs of
+			DNil 					-> NI
+		|	Consd x xs				->
+			{
+				case x._2 of
+					NIL 			-> be w k xs
+				|	CONCAT d1 d2	-> be w k (Consd[Pair] (x._1, d1) (Consd[Pair] (x._1, d2) xs))                       
+				|	NEST j d		-> be w k (Consd[Pair] (j + x._1, d)  xs)
+				|   TEXT s 			-> TE s (be w k xs)
+				| 	LINE 			-> LI x._1 (be w k xs)
+				|	UNION d1 d2 	-> better w k (be w k (Consd[Pair] (x._1, d1) xs)) (be w k (Consd[Pair] (x._1, d2) xs))
+
+			}
+
+
+;
+
+
+let best (w: Int) (k: Int) (d: Doc): PDoc =
+
+	be w k (Consd[Pair] (0, d) (DNil[Pair]))
+;
+
+let concat (x : String) (y : String): String= 
+	x.concat(y)
+;
+
+let rec space (i: Int): String=
+	if i==0 then
+				""
+			 else
+			 	" ".concat(space (i-1))
+;
+
+let rec showDoc(doc: PDoc): String=
+	case doc of
+			TE s x	-> concat s (showDoc x)
+		|	LI i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	NI			-> ""
+;
+
+let pretty (w: Int) (d: Doc): String =
+	showDoc (best w 0 d)
+;
+
+
+
+
+
+
+let rec braketExpr (expr: ArithExpr): Doc =
+
+	(text "(") <> (showArithExpr expr) <> (text ")")
+
+and
+
+isAddSub (expr: ArithExpr): Doc =
+
+	case expr of
+			Add _ _ 	->	braketExpr expr
+		|	Sub _ _ 	->	braketExpr expr
+		|	_			->	showArithExpr expr
+
+and
+
+showArithExpr (expr: ArithExpr): Doc =
+	case expr of
+			Add	e1 e2		-> (showArithExpr e1) <> (text " + ") <> (showArithExpr e2)
+		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (showArithExpr e2)
+		|	Mul e1 e2		-> (isAddSub e1) 	  <> (text " * ") <> (isAddSub e2)
+		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (isAddSub e2)
+		|	Integer x 		-> text x.toString() 
+;
+
+
+let getFirst (l : ParseOutput[ArithExpr]): ArithExpr  =
+
+    case l of
+        Nil             ->  Integer 1
+     |  Cons x _        ->  x._1
+
+;
+let result = arithExpr `parseString[ArithExpr]` "(1+2)*(3-(4*5+(6*7)))-3*4"
+;
+
+pretty 30 (showArithExpr (getFirst result))
