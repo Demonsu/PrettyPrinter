@@ -12,9 +12,6 @@ data DList[A] = DNil
               | Cons A (DList[A])
 ;
 
-let (++>)[A] (a: A) (l: DList[A]): DList[A] =
-	Cons[A] a l
-;
 
 
 data PDoc = NI
@@ -103,6 +100,7 @@ let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 
 
 let best (w: Int) (k: Int) (d: Doc): PDoc =
+
 	be w k (Cons[Pair] (0, d) (DNil[Pair]))
 ;
 
@@ -128,8 +126,6 @@ let pretty (w: Int) (d: Doc): String =
 	showDoc (best w 0 d)
 ;
 
-let doc = UNION (TEXT "hello") (TEXT "world")
-;
 
 
 
@@ -141,4 +137,4 @@ let rec looptext (x: Int) : Doc =
 ;
 
 
-pretty 30 (looptext 300)
+pretty 30 (looptext 200)

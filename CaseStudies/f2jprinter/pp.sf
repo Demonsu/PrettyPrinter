@@ -65,22 +65,6 @@ data Order = Equals
            | GreaterThan
            | LessThan
            ;
-type Thunk[A] = Unit -> A;
-
-let invoke[A] (t : Thunk[A]) : A =
-    t ();
-
-type Show[A] = A -> String;
-
-data Maybe[A] = Nothing
-              | Just A
-              ;
-
-let maybeToString[A] (tostr : Show[A]) (m : Maybe[A]) : String =
-    case m of
-        Nothing     -> "Nothing"
-     |  Just x      -> "Just \{tostr x}";
-
 
 data PList[A] = Nil
               | Cons A (Thunk[PList[A]])
@@ -193,6 +177,15 @@ let pListToString[A] (tostr : A -> String) (l : PList[A]) : String =
 
     inner.append("]").toString();
 
+let rec pListEq[A] (eq : Eq[A]) (a : PList[A]) (b : PList[A]) : Bool =
+    case a of
+        Nil         -> { case b of Nil -> True | Cons _ _ -> False }
+     |  Cons ax axs ->
+            case b of
+                Nil         -> False
+             |  Cons bx bxs -> if eq ax bx then
+                                    pListEq[A] eq (invoke[PList[A]] axs) (invoke[PList[A]] bxs)
+                               else False;
 
 
 type PString = PList[Char];
@@ -1537,83 +1530,17 @@ and showF2JExprs (exprs: PList[F2JExpr]): Doc=
 
 
 
-let println (s : String) : Unit = { java.lang.System.out.println(s); () }
-;
-let print (s : String) : Unit = { java.lang.System.out.print(s); () }
-;
-type TestFn = {
-    name : String,
-    fn   : Unit -> Unit
-}
-;
-let fool (x: Unit) (y: Unit): Unit= {
-	()
-}
-;
-let rec runTest (test : TestFn) : Unit = {
-    let testingPrefix : String = "\u001b[31;1mtesting\u001b[0m\t";
-    println testingPrefix.concat(test.name).concat(" :");
-    test.fn ();
-    println "...check it yourself"
-}
-and 
-runTests (tests: PList[TestFn]): Unit= {
-	case tests of 
-			Nil 			-> ()
-		|	Cons x xs		-> fool (runTest x) (runTests (invoke[PList[TestFn]] xs)) 
-}
-;
-
-let firstParseOutputEq[A] (eq : Eq[A]) (r : ParseOutput[A]) (expected : ParseContext[A]) : Bool =
-    case first[ParseContext[A]] r of
-        Nothing         -> False
-     |  Just x          -> parseContextEq[A] eq x expected;
-
-let assertFirstParseOutputEq[A] (eq : Eq[A]) (show : Show[A]) (src : ParseOutput[A]) (expected : ParseContext[A]) : Bool =
-    if firstParseOutputEq[A] eq src expected then
-        True
-    else {
-        printErrLn "Assert failed!\n\tExpecting the 1st result: \{parseContextToString[A] show expected}"
-                   .concat("\n\tBut found output        : \{parseOutputToString[A] show src}");
-        False
-    };
-
-let firstParseResultEq[A] (eq : Eq[A]) (r : ParseOutput[A]) (expected : A) : Bool =
-    case first[ParseContext[A]] r of
-        Nothing         -> False
-     |  Just x          -> eq x._1 expected;
-
-let assertFirstParseResultEq[A] (eq : Eq[A]) (show : Show[A]) (src : ParseOutput[A]) (expected : A) = {
-    println "Asserting\n\tExpecting the 1st result: \{show expected}"
-            .concat("\n\tOutput                  : \{parseOutputToString[A] show src}");
-
-    if firstParseResultEq[A] eq src expected then
-        True
-    else {
-        printErrLn "Assert failed!";
-        False
-    }
-};
-
-let assertParseStringResult[A] (eq : Eq[A]) (show : Show[A]) (expected : A) (p : Parser[A]) (s : String) = {
-    println "=== Parsing \"\{s}\"";
-
-    let output = p `parseString[A]` s;
-    assertFirstParseResultEq[A] eq show output expected
-};
 
 
 
-let fuckFirstF2JParseResult (l : ParseOutput[F2JExpr]) =
-    let result =
-        case l of
-            Nil             -> "Empty result!"
-         |  Cons x _        -> f2jExprToString x._1
-    ;
+let getFirst (l : ParseOutput[F2JExpr]): F2JExpr  =
 
-    println result
+    case l of
+        Nil             ->  F2JStringLiteral "Empty result!"
+     |  Cons x _        ->  x._1
+
 ;
 
 {
-	fuckFirstF2JParseResult (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
+    showDoc (showF2JExpr (getFirst (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")))
 }

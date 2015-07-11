@@ -112,6 +112,6 @@ let rec looptext (x: Int) : Doc =
 ;
 
 
-pretty 30 (looptext 300)
+pretty 30 (looptext 200)
 
 

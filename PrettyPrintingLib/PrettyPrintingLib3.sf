@@ -14,9 +14,6 @@ data DList[A] = DNil
               | Cons A (DList[A])
 ;
 
-let (++>)[A] (a: A) (l: DList[A]): DList[A] =
-	Cons[A] a l
-;
 
 -- print doc, for converting into string
 
@@ -113,12 +110,8 @@ let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 -- return the best layout among groups
 
 let best (w: Int) (k: Int) (d: Doc): PDoc =
+
 	be w k (Cons[Pair] (0, d) (DNil[Pair]))
-	-- case d of
-	-- 		NIL 			-> NIL
-	-- 	|	LINE i x 		-> LINE i (best w k x)
-	-- 	|	TEXT s x 		-> TEXT s (best w (k + s.length()) x)
-	-- 	|	UNION x y 		-> better w k (best w k x) (best w k y)
 ;
 
 let concat (x : String) (y : String): String= 
@@ -143,7 +136,5 @@ let pretty (w: Int) (d: Doc): String =
 	showDoc (best w 0 d)
 ;
 
-let doc = UNION (TEXT "hello") (TEXT "world")
-;
 
 
