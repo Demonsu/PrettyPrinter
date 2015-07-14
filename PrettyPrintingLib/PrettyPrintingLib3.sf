@@ -11,7 +11,7 @@ data Doc =	NIL
 -- for docpair list, seperating from lazy PList outside
 
 data DList[A] = DNil
-              | Consd A (DList[A])
+              | DCons A (DList[A])
 ;
 
 
@@ -92,15 +92,15 @@ let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
 let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 	case docs of
 			DNil 					-> NI
-		|	Consd x xs				->
+		|	DCons x xs				->
 			{
 				case x._2 of
 					NIL 			-> be w k xs
-				|	CONCAT d1 d2	-> be w k (Consd[Pair] (x._1, d1) (Consd[Pair] (x._1, d2) xs))                       
-				|	NEST j d		-> be w k (Consd[Pair] (j + x._1, d)  xs)
+				|	CONCAT d1 d2	-> be w k (DCons[Pair] (x._1, d1) (DCons[Pair] (x._1, d2) xs))                       
+				|	NEST j d		-> be w k (DCons[Pair] (j + x._1, d)  xs)
 				|   TEXT s 			-> TE s (be w k xs)
 				| 	LINE 			-> LI x._1 (be w k xs)
-				|	UNION d1 d2 	-> better w k (be w k (Consd[Pair] (x._1, d1) xs)) (be w k (Consd[Pair] (x._1, d2) xs))
+				|	UNION d1 d2 	-> better w k (be w k (DCons[Pair] (x._1, d1) xs)) (be w k (DCons[Pair] (x._1, d2) xs))
 
 			}
 
@@ -111,7 +111,7 @@ let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 
 let best (w: Int) (k: Int) (d: Doc): PDoc =
 
-	be w k (Consd[Pair] (0, d) (DNil[Pair]))
+	be w k (DCons[Pair] (0, d) (DNil[Pair]))
 ;
 
 let concat (x : String) (y : String): String= 
