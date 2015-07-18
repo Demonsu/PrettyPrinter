@@ -1,9 +1,0 @@
--- list definition
-
-data PList[A] = Nil
-              | Cons A (PList[A])
-;
-
-let (+>)[A] (a: A)(l: PList[A]): PList[A]=
-	Cons[A] a l
-;

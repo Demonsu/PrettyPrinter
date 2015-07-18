@@ -1,9 +1,0 @@
-data INT = INT;
-let y (j: Int)=
-2;
-let x (i: INT)= 
-	case i of 
-		_ -> y
-		 3
-;
-x (INT)
