@@ -2,7 +2,13 @@
 
 [![License BSD 2][badge-license]](LICENSE)
 
-pretty printer library in F2J &amp; Haskell
+Pretty Printer Library in F2J.
+
+Happy ending, and nice pizza!
+
+Xia Fan
+15th, July 2015
+
 
 ## Usage
 
@@ -36,14 +42,11 @@ $ make test
 * [x] An Integration of Parser and Pretty Printer for a Subset of F2J (`CaseStudies/f2jprinter/pp.sf`)
 
 
-Happy ending, and nice pizza!
-
-Xia Fan
-15th, July 2015
-
 
 ## License
 
 BSD 2
 
 [badge-license]: https://img.shields.io/badge/license-BSD_2-green.svg
+
+
