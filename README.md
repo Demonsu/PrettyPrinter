@@ -1,4 +1,7 @@
 # PrettyPrinter Combinators in F2J
+
+[![License BSD 2][badge-license]](LICENSE)
+
 pretty printer library in F2J &amp; Haskell
 
 
