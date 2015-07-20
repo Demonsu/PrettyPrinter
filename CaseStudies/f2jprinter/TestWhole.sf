@@ -1,6 +1,6 @@
 {-#
     INCLUDE "f2j_parser.sf"
-    INCLUDE "PrettyPrintingLib.sf"
+    INCLUDE "PrettyPrintingLib3.sf"
     INCLUDE "F2JToDocument.sf"
 #-}
 
@@ -24,6 +24,6 @@ let getFirst (l : ParseOutput[F2JExpr]): F2JExpr  =
 ;
 
 {
-    showDoc (showF2JExpr (getFirst (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")))
+    pretty 30 (showF2JExpr (getFirst (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")))
     --printFirstF2JParseResult (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")
 }

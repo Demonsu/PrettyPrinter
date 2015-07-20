@@ -780,7 +780,7 @@ data Doc =	NIL
 
 
 data DList[A] = DNil
-              | Consd A (DList[A])
+              | DCons A (DList[A])
 ;
 
 
@@ -854,15 +854,15 @@ let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
 let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 	case docs of
 			DNil 					-> NI
-		|	Consd x xs				->
+		|	DCons x xs				->
 			{
 				case x._2 of
 					NIL 			-> be w k xs
-				|	CONCAT d1 d2	-> be w k (Consd[Pair] (x._1, d1) (Consd[Pair] (x._1, d2) xs))                       
-				|	NEST j d		-> be w k (Consd[Pair] (j + x._1, d)  xs)
+				|	CONCAT d1 d2	-> be w k (DCons[Pair] (x._1, d1) (DCons[Pair] (x._1, d2) xs))                       
+				|	NEST j d		-> be w k (DCons[Pair] (j + x._1, d)  xs)
 				|   TEXT s 			-> TE s (be w k xs)
 				| 	LINE 			-> LI x._1 (be w k xs)
-				|	UNION d1 d2 	-> better w k (be w k (Consd[Pair] (x._1, d1) xs)) (be w k (Consd[Pair] (x._1, d2) xs))
+				|	UNION d1 d2 	-> better w k (be w k (DCons[Pair] (x._1, d1) xs)) (be w k (DCons[Pair] (x._1, d2) xs))
 
 			}
 
@@ -872,7 +872,7 @@ let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
 
 let best (w: Int) (k: Int) (d: Doc): PDoc =
 
-	be w k (Consd[Pair] (0, d) (DNil[Pair]))
+	be w k (DCons[Pair] (0, d) (DNil[Pair]))
 ;
 
 let concat (x : String) (y : String): String= 
@@ -907,7 +907,6 @@ let rec braketExpr (expr: ArithExpr): Doc =
 	(text "(") <> (showArithExpr expr) <> (text ")")
 
 and
-
 isAddSub (expr: ArithExpr): Doc =
 
 	case expr of
@@ -916,13 +915,19 @@ isAddSub (expr: ArithExpr): Doc =
 		|	_			->	showArithExpr expr
 
 and
+notInt (expr: ArithExpr): Doc =
 
+	case expr of
+			Integer i	->	text i.toString()
+		|	_			->  braketExpr expr
+
+and
 showArithExpr (expr: ArithExpr): Doc =
 	case expr of
 			Add	e1 e2		-> (showArithExpr e1) <> (text " + ") <> (showArithExpr e2)
-		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (showArithExpr e2)
+		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (isAddSub e2)
 		|	Mul e1 e2		-> (isAddSub e1) 	  <> (text " * ") <> (isAddSub e2)
-		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (isAddSub e2)
+		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (notInt e2)
 		|	Integer x 		-> text x.toString() 
 ;
 
@@ -930,10 +935,13 @@ showArithExpr (expr: ArithExpr): Doc =
 let getFirst (l : ParseOutput[ArithExpr]): ArithExpr  =
 
     case l of
-        Nil             ->  Integer 1
+        Nil             ->  Integer 0 -- error
      |  Cons x _        ->  x._1
 
 ;
+
+
+
 let result = arithExpr `parseString[ArithExpr]` "(1+2)*(3-(4*5+(6*7)))-3*4"
 ;
 

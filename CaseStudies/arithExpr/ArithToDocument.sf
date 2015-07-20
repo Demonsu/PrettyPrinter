@@ -6,7 +6,6 @@ let rec braketExpr (expr: ArithExpr): Doc =
 	(text "(") <> (showArithExpr expr) <> (text ")")
 
 and
-
 isAddSub (expr: ArithExpr): Doc =
 
 	case expr of
@@ -15,13 +14,19 @@ isAddSub (expr: ArithExpr): Doc =
 		|	_			->	showArithExpr expr
 
 and
+notInt (expr: ArithExpr): Doc =
 
+	case expr of
+			Integer i	->	text i.toString()
+		|	_			->  braketExpr expr
+
+and
 showArithExpr (expr: ArithExpr): Doc =
 	case expr of
 			Add	e1 e2		-> (showArithExpr e1) <> (text " + ") <> (showArithExpr e2)
-		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (showArithExpr e2)
+		|	Sub e1 e2		-> (showArithExpr e1) <> (text " - ") <> (isAddSub e2)
 		|	Mul e1 e2		-> (isAddSub e1) 	  <> (text " * ") <> (isAddSub e2)
-		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (isAddSub e2)
+		|	Div e1 e2		-> (isAddSub e1) 	  <> (text " / ") <> (notInt e2)
 		|	Integer x 		-> text x.toString() 
 ;
 

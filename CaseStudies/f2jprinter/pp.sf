@@ -1233,33 +1233,108 @@ and f2jProgram : Parser[F2JExpr] =
 ;
 
 data Doc =	NIL
-        |	TEXT String Doc
-		|	LINE Int Doc
+        |	TEXT String
+		|	LINE
+		|	NEST Int Doc
+		|	UNION Doc Doc
+		|   CONCAT Doc Doc
+;
+
+
+data DList[A] = DNil
+              | DCons A (DList[A])
+;
+
+
+
+data PDoc = NI
+		|	TE String PDoc
+		|	LI Int PDoc
+;
+
+type Pair = (Int, Doc)
 ;
 
 let nil = NIL
 ;
 
-let rec (<>) (x: Doc) (y: Doc) : Doc=
-	case x of
-			TEXT s d 	-> TEXT s (d <> y)
-		|	LINE i e	-> LINE i (e <> y)		
-		|	NIL 		-> y
+let (<|>) (x: Doc) (y: Doc) : Doc =
+	UNION x y
 ;
 
-let rec nest (i: Int) (x: Doc): Doc=
-	case x of
-			TEXT s d 	-> TEXT s (nest i d)
-		|	LINE j c 	-> LINE (i+j) (nest i c)
-		|	NIL 		-> NIL
+
+let text (s: String): Doc =
+	TEXT s
 ;
 
-let text (s: String): Doc=
-	TEXT s NIL
+let line: Doc = 
+	LINE
 ;
 
-let line: Doc= 
-	LINE 0 NIL
+let (<>) (x: Doc) (y: Doc) : Doc =
+	CONCAT x y
+;
+
+let nest (i: Int) (x: Doc): Doc =
+	NEST i x
+;
+
+
+let rec flatten (d: Doc): Doc =
+	case d of
+			NIL 			-> NIL
+		|	LINE 			-> TEXT " "
+		|	TEXT s 			-> TEXT s 
+		|	NEST i x 		-> NEST i (flatten x)
+		|	UNION x y		-> flatten x
+		|	CONCAT x y 		-> (flatten x) <> (flatten y)
+;
+
+
+let rec group (d: Doc): Doc =
+	(flatten d) <|> d
+;
+
+
+let rec fits (w: Int) (d: PDoc): Bool=
+	if w < 0 then False
+	else 
+		case d of
+				NI 				-> True
+			|	TE s x  		-> fits (w - s.length()) x
+			|	LI i x 	  		-> True
+;
+
+
+let better (w: Int) (k: Int) (x: PDoc) (y: PDoc): PDoc =
+	if fits (w - k) x then x
+	else  y
+;
+
+
+
+let rec be (w: Int) (k: Int) (docs: DList[Pair]): PDoc =
+	case docs of
+			DNil 					-> NI
+		|	DCons x xs				->
+			{
+				case x._2 of
+					NIL 			-> be w k xs
+				|	CONCAT d1 d2	-> be w k (DCons[Pair] (x._1, d1) (DCons[Pair] (x._1, d2) xs))                       
+				|	NEST j d		-> be w k (DCons[Pair] (j + x._1, d)  xs)
+				|   TEXT s 			-> TE s (be w k xs)
+				| 	LINE 			-> LI x._1 (be w k xs)
+				|	UNION d1 d2 	-> better w k (be w k (DCons[Pair] (x._1, d1) xs)) (be w k (DCons[Pair] (x._1, d2) xs))
+
+			}
+
+
+;
+
+
+let best (w: Int) (k: Int) (d: Doc): PDoc =
+
+	be w k (DCons[Pair] (0, d) (DNil[Pair]))
 ;
 
 let concat (x : String) (y : String): String= 
@@ -1273,19 +1348,20 @@ let rec space (i: Int): String=
 			 	" ".concat(space (i-1))
 ;
 
-let rec tab (i: Int): String=
-	if i==0 then
-				""
-			 else
-			 	"\t".concat(tab (i-1))
+let rec showDoc(doc: PDoc): String=
+	case doc of
+			TE s x	-> concat s (showDoc x)
+		|	LI i d 	-> concat (concat "\n" (space i)) (showDoc d)
+		| 	NI			-> ""
 ;
 
-let rec showDoc(doc: Doc): String=
-	case doc of
-			TEXT s x	-> concat s (showDoc x)
-		|	LINE i d 	-> concat (concat "\n" (space i)) (showDoc d)
-		| 	NIL			-> ""
+let pretty (w: Int) (d: Doc): String =
+	showDoc (best w 0 d)
 ;
+
+
+
+
 
 let lengF2JType (ftype: F2JType): Int=
 	case ftype of
@@ -1542,5 +1618,5 @@ let getFirst (l : ParseOutput[F2JExpr]): F2JExpr  =
 ;
 
 {
-    showDoc (showF2JExpr (getFirst (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")))
+    pretty 30 (showF2JExpr (getFirst (f2jProgram `parseString[F2JExpr]` "data PList[A] = Nil | Cons A (PList[A]); let rec recursive[A] (a : A) : A = recursive[A] a; recursive[Int] 1")))
 }
